@@ -1,0 +1,79 @@
+# Builds an installable ODOS APK on every push to main (or on demand from the Actions tab)
+# and publishes it at: Releases → "ODOS for Android (latest build)".
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Repo secret (Settings → Secrets and variables → Actions). Without it the app installs but
+      # shows a "add your Mapbox token" screen instead of the map.
+      EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+      EXPO_PUBLIC_RIDB_KEY: ${{ secrets.RIDB_KEY }}
+      ODOS_VERSION_CODE: ${{ github.run_number }}
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Warn if the Mapbox token secret is missing
+        if: env.EXPO_PUBLIC_MAPBOX_TOKEN == ''
+        run: echo "::warning::MAPBOX_TOKEN secret is not set. The APK will build, but the map stays blank until you add it and re-run."
+
+      - run: npm ci
+
+      - name: Tests, types, lint
+        run: |
+          npm test
+          npm run typecheck
+          npm run lint
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Collect APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk odos.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odos-apk
+          path: odos.apk
+
+      - name: Publish as the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest odos.apk \
+            --title "ODOS for Android (latest build)" \
+            --notes "Build #${{ github.run_number }} from ${GITHUB_SHA::7}. On your phone: tap odos.apk below, then Install." \
+            --target "$GITHUB_SHA" \
+            --latest

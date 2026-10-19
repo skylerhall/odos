@@ -40,6 +40,12 @@ how to send someone your location.
 
 ## Put it on your phone
 
+**Easiest: download the latest build.** GitHub builds a fresh APK every time `main` changes. On
+your phone, open https://github.com/skylerhall/odos/releases/latest (signed in to GitHub), tap
+`odos.apk`, then tap Install. For the map to work, add your Mapbox public token once as a repo
+secret named `MAPBOX_TOKEN` (Settings → Secrets and variables → Actions → New repository secret),
+then re-run the build from the Actions tab.
+
 **Option A: build the APK on your computer** (you need Android Studio installed once):
 
 ```bash
