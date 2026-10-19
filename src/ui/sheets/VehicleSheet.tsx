@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import { searchVehicles } from '../../core/vehicles/match';
 import type { FuelKind, Vehicle } from '../../core/vehicles/types';
 import { KWH_PER_GALLON } from '../../core/vehicles/types';
 import { decodeVin, epaMakes, epaModels, epaOptions, epaVehicle, epaYears, vinToOptions, type MenuItem } from '../../services/vehicleLookup';
 import { BigButton, Chip, ResultRow, Sheet, useTheme } from '../controls';
+import { useAsync } from '../useAsync';
 
 type Mode = 'search' | 'exact' | 'vin' | 'custom';
 
@@ -12,14 +13,14 @@ type Mode = 'search' | 'exact' | 'vin' | 'custom';
  * Pick a vehicle four ways: type to search the built-in list (works offline), walk the official
  * EPA year → make → model → engine menus (exact, needs signal), decode a VIN, or type it in.
  */
-export function VehicleSheet(props: { visible: boolean; onClose: () => void; onPick: (v: Vehicle) => void }) {
+export function VehicleSheet(props: { onClose: () => void; onPick: (v: Vehicle) => void }) {
   const [mode, setMode] = useState<Mode>('search');
   const pick = (v: Vehicle) => {
     props.onPick(v);
     props.onClose();
   };
   return (
-    <Sheet visible={props.visible} title="Your vehicle" onClose={props.onClose}>
+    <Sheet visible title="Your vehicle" onClose={props.onClose}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 6 }}>
         <Chip label="Search" on={mode === 'search'} onPress={() => setMode('search')} />
         <Chip label="Exact year" on={mode === 'exact'} onPress={() => setMode('exact')} />
@@ -81,45 +82,39 @@ function SearchMode({ onPick }: { onPick: (v: Vehicle) => void }) {
 function ExactMode({ onPick }: { onPick: (v: Vehicle) => void }) {
   const t = useTheme();
   const [path, setPath] = useState<{ year?: MenuItem; make?: MenuItem; model?: MenuItem }>({});
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [pickError, setPickError] = useState<string | null>(null);
 
   const step: 'year' | 'make' | 'model' | 'option' = !path.year ? 'year' : !path.make ? 'make' : !path.model ? 'model' : 'option';
-
-  useEffect(() => {
-    let live = true;
-    setBusy(true);
-    setError(null);
-    const load =
-      step === 'year'
+  const { year, make, model } = path;
+  const menu = useAsync(
+    () =>
+      !year
         ? epaYears().then((y) => y.sort((a, b) => Number(b.value) - Number(a.value)))
-        : step === 'make'
-          ? epaMakes(path.year!.value)
-          : step === 'model'
-            ? epaModels(path.year!.value, path.make!.value)
-            : epaOptions(path.year!.value, path.make!.value, path.model!.value);
-    load
-      .then((r) => live && setItems(r))
-      .catch(() => live && setError('Couldn’t reach fueleconomy.gov. Use Search for the offline list.'))
-      .finally(() => live && setBusy(false));
-    return () => {
-      live = false;
-    };
-  }, [step, path.year, path.make, path.model]);
+        : !make
+          ? epaMakes(year.value)
+          : !model
+            ? epaModels(year.value, make.value)
+            : epaOptions(year.value, make.value, model.value),
+    `${year?.value}|${make?.value}|${model?.value}`,
+  );
+  const items = menu.data ?? [];
+  const busy = menu.loading || picking;
+  const error = pickError ?? (menu.error ? 'Couldn’t reach fueleconomy.gov. Use Search for the offline list.' : null);
 
   const choose = async (item: MenuItem) => {
     if (step === 'year') setPath({ year: item });
     else if (step === 'make') setPath({ ...path, make: item });
     else if (step === 'model') setPath({ ...path, model: item });
     else {
-      setBusy(true);
+      setPicking(true);
+      setPickError(null);
       try {
         onPick(await epaVehicle(item.value));
       } catch {
-        setError('Couldn’t load that vehicle. Try again.');
+        setPickError('Couldn’t load that vehicle. Try again.');
       } finally {
-        setBusy(false);
+        setPicking(false);
       }
     }
   };

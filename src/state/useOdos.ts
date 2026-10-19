@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as Speech from 'expo-speech';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Linking, Share } from 'react-native';
 import { NAV } from '../config';
 import { burn, fullTank, outlook, type FuelOutlook, type FuelState } from '../core/fuel';
@@ -56,17 +56,20 @@ export function useOdos() {
   const [offline, setOffline] = useState<OfflineStatus>({ state: 'idle', percent: 0 });
   const [toast, setToast] = useState<Toast | null>(null);
   const [pin, setPin] = useState<LngLat | null>(null);
+  /** MPG multiplier from current weather (rain, snow, cold). Set by useWeather. */
+  const [efficiency, setEfficiency] = useState(1);
 
   // Latest values for callbacks that outlive a render (GPS watcher, timers).
-  const live = useRef({ vehicle, fuel, settings, fix, destination, stops, route, progress });
-  live.current = { vehicle, fuel, settings, fix, destination, stops, route, progress };
+  const live = useRef({ vehicle, fuel, settings, fix, destination, stops, route, progress, efficiency });
+  useLayoutEffect(() => {
+    live.current = { vehicle, fuel, settings, fix, destination, stops, route, progress, efficiency };
+  });
   const tracker = useRef<NavTracker | null>(null);
   const lastFix = useRef<Fix | null>(null);
   const bufferHandled = useRef(false);
   const simAlong = useRef(0);
   const routeSeq = useRef(0);
   const advisor = useRef(new LaneAdvisor());
-  const t0 = useRef(Date.now());
   const rerouting = useRef(false);
 
   // ── feedback ──
@@ -219,7 +222,7 @@ export function useOdos() {
     setFuel(full);
     bufferHandled.current = false;
     setGas(null);
-    const o = outlook(full, v, { cruiseMph: live.current.route?.cruiseMph });
+    const o = outlook(full, v, { cruiseMph: live.current.route?.cruiseMph, efficiency: live.current.efficiency });
     const msg = `Full tank. ${fmtMiles(o.rangeMi)} of range. Next fuel alert in ${fmtMiles(o.untilAlertMi)}.`;
     notify(msg, 'good');
     speak(msg);
@@ -234,13 +237,14 @@ export function useOdos() {
     vehicle && fuel
       ? outlook(fuel, vehicle, {
           cruiseMph: route?.cruiseMph,
+          efficiency,
           remainingMiles: progress ? progress.remainingMeters / MI : route ? route.distance / MI : undefined,
         })
       : null;
 
   const findGas = useCallback(async (): Promise<GasPlan | null> => {
     const { vehicle: v, fuel: f, route: r, progress: p, fix: here } = live.current;
-    const rangeMi = v && f ? outlook(f, v, { cruiseMph: r?.cruiseMph }).rangeMi : 60;
+    const rangeMi = v && f ? outlook(f, v, { cruiseMph: r?.cruiseMph, efficiency: live.current.efficiency }).rangeMi : 60;
     if (r) {
       const plan = await planGasStop(r, p?.along ?? 0, rangeMi);
       setGas(plan);
@@ -296,7 +300,8 @@ export function useOdos() {
         const d = haversine(prev.coord, f.coord);
         // Ignore GPS jumps and jitter while parked.
         if (d > 2 && d < 3000 && (f.accuracy == null || f.accuracy < 60)) {
-          setFuel((cur) => (cur ? burn(cur, v, d, f.mph) : cur));
+          const eff = live.current.efficiency;
+          setFuel((cur) => (cur ? burn(cur, v, d, f.mph, eff) : cur));
         }
       }
 
@@ -389,6 +394,7 @@ export function useOdos() {
 
   // ── lanes: map guidance always; speed-based advice when lane speeds exist (Sim for now) ──
   useEffect(() => {
+    const t0 = Date.now();
     const id = setInterval(() => {
       const { progress: p, settings: s, route: r, fix: here } = live.current;
       const ahead = p?.lanesAhead ?? null;
@@ -402,7 +408,7 @@ export function useOdos() {
         setLanes({ count, guides: ahead?.lanes ?? null, inMeters: ahead?.inMeters ?? null, advice: null, simulated: false });
         return;
       }
-      const obs = simulateLanes(count, Math.max(30, here?.mph ?? 60), (Date.now() - t0.current) / 1000);
+      const obs = simulateLanes(count, Math.max(30, here?.mph ?? 60), (Date.now() - t0) / 1000);
       const advice = advisor.current.update(obs, { allowed });
       setLanes({ count, guides: ahead?.lanes ?? null, inMeters: ahead?.inMeters ?? null, advice, simulated: true });
     }, 2000);
@@ -437,6 +443,8 @@ export function useOdos() {
     setSettings((s) => ({ ...s, [key]: !s[key] }));
     if (key === 'voice') Speech.stop();
   }, []);
+
+  const dismissToast = useCallback(() => setToast(null), []);
 
   const setSimSpeed = useCallback((simSpeed: number) => setSettings((s) => ({ ...s, simSpeed })), []);
 
@@ -480,7 +488,10 @@ export function useOdos() {
       search,
       requestLocation,
       setPin,
-      dismissToast: () => setToast(null),
+      setEfficiency,
+      notify,
+      speak,
+      dismissToast,
     },
   };
 }

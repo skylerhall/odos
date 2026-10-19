@@ -4,9 +4,11 @@ import { StyleSheet } from 'react-native';
 import { MAPBOX_TOKEN, STYLE } from '../config';
 import type { LngLat } from '../core/geo';
 import type { Stop } from '../core/places';
+import type { Condition } from '../core/weather';
 import { congestionRuns, type Route } from '../core/route';
 import type { Fix } from '../state/useOdos';
 import { CONGESTION_COLORS } from './theme';
+import { WeatherMapLayers } from './WeatherOverlay';
 
 if (MAPBOX_TOKEN) Mapbox.setAccessToken(MAPBOX_TOKEN);
 
@@ -24,6 +26,9 @@ export function MapPane(props: {
   pin: LngLat | null;
   onLongPress: (coord: LngLat) => void;
   onUserPan: () => void;
+  /** Rain/snow drawn inside the map scene. */
+  weather: Condition | null;
+  weatherFx: boolean;
 }) {
   const routeShape = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (!props.route) return null;
@@ -73,6 +78,7 @@ export function MapPane(props: {
         defaultSettings={{ centerCoordinate: props.fix?.coord ?? [-98.5, 39.8], zoomLevel: props.fix ? 13 : 3.5 }}
       />
       {props.sim && props.fix ? <Mapbox.CustomLocationProvider coordinate={props.fix.coord} heading={props.fix.heading ?? 0} /> : null}
+      <WeatherMapLayers cond={props.weather} enabled={props.weatherFx} night={props.night} />
       <Mapbox.LocationPuck puckBearingEnabled puckBearing="course" pulsing={{ isEnabled: true }} />
 
       {props.traffic ? (

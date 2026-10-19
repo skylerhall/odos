@@ -7,6 +7,7 @@ import { MI } from './core/geo';
 import { formatCoords } from './core/share';
 import { hasToken } from './services/mapbox';
 import { useOdos } from './state/useOdos';
+import { useWeather } from './state/useWeather';
 import { BigButton, RoundToggle, ThemeContext } from './ui/controls';
 import { clockIn, duration, miles } from './ui/format';
 import { FuelPanel } from './ui/FuelPanel';
@@ -17,9 +18,12 @@ import { GasSheet } from './ui/sheets/GasSheet';
 import { RestSheet, type RestFrom } from './ui/sheets/RestSheet';
 import { TripSheet } from './ui/sheets/TripSheet';
 import { VehicleSheet } from './ui/sheets/VehicleSheet';
+import { WeatherSheet } from './ui/sheets/WeatherSheet';
+import { WeatherChip } from './ui/WeatherChip';
+import { WeatherOverlay } from './ui/WeatherOverlay';
 import { DAY, NIGHT } from './ui/theme';
 
-type SheetName = 'dest' | 'vehicle' | 'rest' | 'gas' | 'trip' | null;
+type SheetName = 'dest' | 'vehicle' | 'rest' | 'gas' | 'trip' | 'weather' | null;
 
 export default function App() {
   return (
@@ -37,11 +41,28 @@ function Main() {
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState<SheetName>(null);
   const [follow, setFollow] = useState(true);
+  const wx = useWeather({
+    fix: odos.fix,
+    route: odos.route,
+    progress: odos.progress,
+    fuelKind: odos.vehicle?.fuel ?? null,
+    speak: a.speak,
+    notify: a.notify,
+  });
+
+  // Rain, snow and cold cut real-world range; feed that into the fuel model.
+  const { setEfficiency } = a;
+  useEffect(() => {
+    setEfficiency(wx.fuelFactor);
+  }, [setEfficiency, wx.fuelFactor]);
 
   // First run: ask for the vehicle so fuel tracking works from the first mile.
-  useEffect(() => {
-    if (odos.loaded && !odos.vehicle) setSheet('vehicle');
-  }, [odos.loaded]);
+  const [firstRunDone, setFirstRunDone] = useState(false);
+  const openSheet: SheetName = sheet ?? (odos.loaded && !odos.vehicle && !firstRunDone ? 'vehicle' : null);
+  const closeSheet = () => {
+    setSheet(null);
+    setFirstRunDone(true);
+  };
 
   const restFroms = useMemo<RestFrom[]>(() => {
     const f: RestFrom[] = [];
@@ -50,7 +71,7 @@ function Main() {
     if (odos.destination) f.push({ key: 'dest', label: '🏁 Destination', coord: odos.destination.coord });
     if (odos.pin) f.push({ key: 'pin', label: '📌 Map pin', coord: odos.pin });
     return f;
-  }, [odos.fix?.coord[0], odos.fix?.coord[1], odos.stops, odos.destination, odos.pin]);
+  }, [odos.fix, odos.stops, odos.destination, odos.pin]);
 
   const trip = odos.route;
   const p = odos.progress;
@@ -85,6 +106,8 @@ function Main() {
               setFollow(false);
             }}
             onUserPan={() => setFollow(false)}
+            weather={wx.shown}
+            weatherFx={wx.fxOn}
           />
         ) : (
           <View style={[styles.center, { backgroundColor: theme.panel, padding: 24 }]}>
@@ -93,6 +116,8 @@ function Main() {
             </Text>
           </View>
         )}
+
+        <WeatherOverlay cond={wx.shown} isDay={wx.isDay && !settings.night} enabled={wx.fxOn} />
 
         {/* ── top ── */}
         <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
@@ -106,11 +131,20 @@ function Main() {
               style={[styles.searchPill, { backgroundColor: theme.bg, borderColor: theme.border }]}
             >
               <Text style={{ fontSize: 22 }}>🔍</Text>
-              <Text style={{ color: theme.muted, fontSize: 20, fontWeight: '700', marginLeft: 10 }}>{odos.routing ? 'Finding route…' : 'Where to?'}</Text>
+              <Text style={{ color: theme.muted, fontSize: 20, fontWeight: '700', marginLeft: 10 }}>
+                {odos.routing ? 'Finding route…' : 'Where to?'}
+              </Text>
             </Pressable>
           )}
+          <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
           {odos.permission === 'denied' && !settings.sim ? (
-            <BigButton icon="📍" label="Location is off. Tap to allow it" tone="danger" onPress={a.requestLocation} style={{ marginTop: 8 }} />
+            <BigButton
+              icon="📍"
+              label="Location is off. Tap to allow it"
+              tone="danger"
+              onPress={a.requestLocation}
+              style={{ marginTop: 8 }}
+            />
           ) : null}
           {odos.pin ? (
             <View style={[styles.pinBar, { backgroundColor: theme.bg, borderColor: theme.border }]}>
@@ -157,52 +191,62 @@ function Main() {
           <FuelPanel vehicle={odos.vehicle} outlook={odos.fuelOutlook} onFillUp={a.fillUp} onPickVehicle={() => setSheet('vehicle')} />
           <View style={styles.actions}>
             <BigButton icon="🔍" label={trip ? 'Add stop' : 'Where to'} onPress={() => setSheet('dest')} style={styles.action} />
-            <BigButton icon="⛽" label="Gas" tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'plain'} onPress={() => setSheet('gas')} style={styles.action} />
+            <BigButton
+              icon="⛽"
+              label="Gas"
+              tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'plain'}
+              onPress={() => setSheet('gas')}
+              style={styles.action}
+            />
             <BigButton icon="🛏" label="Rest ≤2h" onPress={() => setSheet('rest')} style={styles.action} />
             <BigButton icon="📤" label="Share" onPress={a.shareLocation} style={styles.action} />
             <BigButton icon="📋" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} style={styles.action} />
           </View>
         </View>
 
-        <DestinationSheet
-          visible={sheet === 'dest'}
-          onClose={() => setSheet(null)}
-          search={a.search}
-          hasTrip={!!trip}
-          onGo={(pl) => {
-            setSheet(null);
-            setFollow(true);
-            a.navigateTo(pl);
-          }}
-          onAddStop={(pl) => {
-            setSheet(null);
-            a.addStop(pl);
-          }}
-        />
-        <VehicleSheet visible={sheet === 'vehicle'} onClose={() => setSheet(null)} onPick={a.setVehicle} />
-        <RestSheet
-          visible={sheet === 'rest'}
-          onClose={() => setSheet(null)}
-          froms={restFroms}
-          search={a.searchRest}
-          onAdd={(o) => {
-            setSheet(null);
-            a.setPin(null);
-            a.addStop(o);
-          }}
-        />
-        <GasSheet
-          visible={sheet === 'gas'}
-          onClose={() => setSheet(null)}
-          find={a.findGas}
-          onAdd={(pl) => {
-            setSheet(null);
-            a.addStop(pl);
-          }}
-        />
+        {openSheet === 'dest' ? (
+          <DestinationSheet
+            onClose={closeSheet}
+            search={a.search}
+            hasTrip={!!trip}
+            onGo={(pl) => {
+              setSheet(null);
+              setFollow(true);
+              a.navigateTo(pl);
+            }}
+            onAddStop={(pl) => {
+              setSheet(null);
+              a.addStop(pl);
+            }}
+          />
+        ) : null}
+        {openSheet === 'vehicle' ? <VehicleSheet onClose={closeSheet} onPick={a.setVehicle} /> : null}
+        {openSheet === 'rest' ? (
+          <RestSheet
+            onClose={closeSheet}
+            froms={restFroms}
+            search={a.searchRest}
+            onAdd={(o) => {
+              setSheet(null);
+              a.setPin(null);
+              a.addStop(o);
+            }}
+          />
+        ) : null}
+        {openSheet === 'gas' ? (
+          <GasSheet
+            onClose={closeSheet}
+            find={a.findGas}
+            onAdd={(pl) => {
+              setSheet(null);
+              a.addStop(pl);
+            }}
+          />
+        ) : null}
+        <WeatherSheet visible={openSheet === 'weather'} onClose={closeSheet} wx={wx} />
         <TripSheet
-          visible={sheet === 'trip'}
-          onClose={() => setSheet(null)}
+          visible={openSheet === 'trip'}
+          onClose={closeSheet}
           destination={odos.destination}
           stops={odos.stops}
           offline={odos.offline}
@@ -222,8 +266,13 @@ function ToastBar({ text, tone, onDone }: { text: string; tone: 'info' | 'amber'
   useEffect(() => {
     const id = setTimeout(onDone, tone === 'amber' ? 9000 : 5000);
     return () => clearTimeout(id);
-  }, []);
-  const colors = { info: ['#1F2937', '#FFFFFF'], amber: ['#F5A300', '#1A1200'], good: ['#12A150', '#FFFFFF'], danger: ['#D92D20', '#FFFFFF'] }[t];
+  }, [onDone, tone]);
+  const colors = {
+    info: ['#1F2937', '#FFFFFF'],
+    amber: ['#F5A300', '#1A1200'],
+    good: ['#12A150', '#FFFFFF'],
+    danger: ['#D92D20', '#FFFFFF'],
+  }[t];
   return (
     <Pressable
       onPress={onDone}
@@ -239,11 +288,30 @@ function ToastBar({ text, tone, onDone }: { text: string; tone: 'info' | 'amber'
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   top: { position: 'absolute', left: 12, right: 12 },
-  searchPill: { minHeight: 64, borderRadius: 32, borderWidth: 2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, elevation: 4 },
+  searchPill: {
+    minHeight: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    elevation: 4,
+  },
   pinBar: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 16, padding: 8, marginTop: 8 },
   pinBtn: { minWidth: 64, minHeight: 56, marginLeft: 6 },
   rail: { position: 'absolute', right: 12 },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, paddingHorizontal: 14, paddingTop: 12, elevation: 8 },
+  bottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    elevation: 8,
+  },
   tripRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, marginBottom: 8 },
   eta: { fontSize: 28, fontWeight: '900', marginRight: 12 },
   tripMeta: { flex: 1, fontSize: 18, fontWeight: '700' },

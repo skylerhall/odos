@@ -18,6 +18,7 @@ how to send someone your location.
 | **Turn-by-turn** | Mapbox routing with live traffic, a route line colored by congestion, voice prompts, automatic rerouting, and lane arrows for the next turn. |
 | **Lane advice** | Each lane is scored as **70% live speed + 30% historical "human-flow" speed**. When that 30% changes which lane wins (the "slow lane is actually faster" case), it's labeled *human-flow flip*. Suggestions only change after a lane has been best for 8 seconds and is at least 3 mph faster, so they don't flicker. |
 | **Offline** | When a trip starts, ODOS saves map tiles along the whole route (20 miles each side at low zoom, 2 miles each side at street level). It also saves gas stations, hotels and campgrounds along the corridor, so the fuel alert, gas picker and rest finder keep working without signal. |
+| **Weather** | A badge next to the map shows the conditions and temperature, and turns amber for hazards. The map shows the weather too: Mapbox-rendered rain and snow that tilt with the 3D view, plus a sun glow, drifting clouds, fog banks, and lightning flashes in storms. ODOS checks the forecast **along your route for the hour you'll reach each point**, warns you once about hazards ahead ("Heavy snow on your route in about 40 miles"), reads official National Weather Service alerts, and lowers the range estimate for rain, snow and cold (much more for EVs). Effects can be turned off, pause when the phone's Reduce Motion setting is on, and can be previewed from the weather sheet. |
 | **Share / copy** | One tap opens the share sheet with your coordinates and a map link that works on any phone. Another tap copies `lat, lon` to the clipboard. |
 | **Accessibility** | One-tap toggles for voice, night mode, traffic and Sim. Every button is at least 56 px, high-contrast and labeled for screen readers. |
 | **Sim mode** | Drives your route at 1×, 4×, 16× or 60× speed so you can watch the fuel alert, auto gas stop and lane logic happen without leaving the couch. |
@@ -68,20 +69,20 @@ or an emulator running. ODOS uses native Mapbox, so it won't run in Expo Go.
 src/
   config.ts          The rules: 50-mi buffer, 15–30 mi gas window, 2-hr rest limit, lane weights
   core/              Pure logic, unit-tested: geo, fuel, places, lanes, route, nav, vehicles
-  services/          Mapbox, fueleconomy.gov, NHTSA, OpenStreetMap, Recreation.gov, offline packs
-  state/useOdos.ts   The app's brain: GPS, routing, fuel alerts, lane advice, persistence
-  ui/                Map, maneuver + lane banner, fuel panel, sheets
-tests/core.test.ts   npm test
+  services/          Mapbox, fueleconomy.gov, NHTSA, OpenStreetMap, Recreation.gov, Open-Meteo, NWS, offline packs
+  state/             useOdos (GPS, routing, fuel, lanes) and useWeather (conditions, route forecast, alerts)
+  ui/                Map, maneuver + lane banner, fuel panel, weather effects, sheets
+tests/              npm test
 scripts/build-apk.sh npm run apk
 ```
 
-Checks: `npm test` and `npm run typecheck`.
+Checks: `npm test`, `npm run typecheck` and `npm run lint`.
 
 ## What's real and what's next
 
 What works now:
-- Routing, traffic, lane arrows, voice prompts, rerouting, search, gas and rest lookups, and offline
-  map tiles all use real APIs.
+- Routing, traffic, lane arrows, voice prompts, rerouting, search, gas and rest lookups, weather,
+  and offline map tiles all use real APIs.
 - The fuel model, the 50-mile buffer and the 15–30 mile gas window run on real GPS distance.
 
 What's still simulated:

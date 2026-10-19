@@ -23,11 +23,14 @@ export function fullTank(vehicle: Vehicle): FuelState {
   return { gallons: vehicle.tankGal, milesSinceFill: 0, lastFillAt: Date.now() };
 }
 
-/** Burn fuel for a distance driven at a given speed. */
-export function burn(state: FuelState, vehicle: Vehicle, meters: number, mph: number): FuelState {
+/**
+ * Burn fuel for a distance driven at a given speed. `efficiency` is any extra multiplier on MPG,
+ * e.g. the weather factor (0.9 = 10% worse in snow).
+ */
+export function burn(state: FuelState, vehicle: Vehicle, meters: number, mph: number, efficiency = 1): FuelState {
   if (meters <= 0) return state;
   const miles = meters / MI;
-  const used = miles / (vehicle.mpg * speedFactor(mph));
+  const used = miles / (vehicle.mpg * speedFactor(mph) * efficiency);
   return { ...state, gallons: Math.max(0, state.gallons - used), milesSinceFill: state.milesSinceFill + miles };
 }
 
@@ -35,8 +38,8 @@ export function burn(state: FuelState, vehicle: Vehicle, meters: number, mph: nu
  * Miles left in the tank. Pass the expected cruising speed (e.g. the route's average) for a
  * Tesla-style "range at the pace you'll actually drive" estimate instead of the EPA sticker.
  */
-export function rangeMiles(state: FuelState, vehicle: Vehicle, cruiseMph?: number): number {
-  return state.gallons * vehicle.mpg * speedFactor(cruiseMph ?? 0);
+export function rangeMiles(state: FuelState, vehicle: Vehicle, cruiseMph?: number, efficiency = 1): number {
+  return state.gallons * vehicle.mpg * speedFactor(cruiseMph ?? 0) * efficiency;
 }
 
 export type FuelOutlook = {
@@ -52,9 +55,9 @@ export type FuelOutlook = {
 export function outlook(
   state: FuelState,
   vehicle: Vehicle,
-  opts: { remainingMiles?: number; cruiseMph?: number } = {},
+  opts: { remainingMiles?: number; cruiseMph?: number; efficiency?: number } = {},
 ): FuelOutlook {
-  const rangeMi = rangeMiles(state, vehicle, opts.cruiseMph);
+  const rangeMi = rangeMiles(state, vehicle, opts.cruiseMph, opts.efficiency);
   return {
     rangeMi,
     untilAlertMi: Math.max(0, rangeMi - FUEL.bufferMiles),
