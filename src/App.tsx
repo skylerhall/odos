@@ -1,18 +1,20 @@
 import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MI } from './core/geo';
 import { formatCoords } from './core/share';
 import { hasToken } from './services/mapbox';
+import { load, save } from './services/storage';
 import { useOdos } from './state/useOdos';
 import { useWeather } from './state/useWeather';
-import { BigButton, RoundToggle, ThemeContext } from './ui/controls';
+import { BigButton, RoundToggle, ThemeContext, useTheme } from './ui/controls';
 import { clockIn, duration, miles } from './ui/format';
 import { FuelPanel } from './ui/FuelPanel';
 import { ManeuverBanner } from './ui/ManeuverBanner';
 import { MapPane } from './ui/MapPane';
+import { PanelHandle } from './ui/PanelHandle';
 import { DestinationSheet } from './ui/sheets/DestinationSheet';
 import { GasSheet } from './ui/sheets/GasSheet';
 import { RestSheet, type RestFrom } from './ui/sheets/RestSheet';
@@ -41,6 +43,17 @@ function Main() {
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState<SheetName>(null);
   const [follow, setFollow] = useState(true);
+  // Minimized: the bottom panel shrinks to one slim bar and the side toggles hide, for more map.
+  const [minimized, setMinimizedState] = useState(false);
+  useEffect(() => {
+    load<boolean>('panelMinimized', false).then(setMinimizedState);
+  }, []);
+  const setMinimized = useCallback((min: boolean) => {
+    setMinimizedState(min);
+    save('panelMinimized', min);
+  }, []);
+  // Measured height of the bottom panel: the re-center button and the driving camera sit above it.
+  const [panelH, setPanelH] = useState(260);
   const wx = useWeather({
     fix: odos.fix,
     route: odos.route,
@@ -106,6 +119,7 @@ function Main() {
               setFollow(false);
             }}
             onUserPan={() => setFollow(false)}
+            bottomInset={panelH + 24}
             weather={wx.shown}
             weatherFx={wx.fxOn}
           />
@@ -163,17 +177,65 @@ function Main() {
 
         {/* ── side rail of one-tap toggles ── */}
         <View style={[styles.rail, { top: insets.top + (trip ? 210 : 90) }]} pointerEvents="box-none">
-          <RoundToggle icon="🔊" label="Voice" on={settings.voice} onPress={() => a.toggle('voice')} />
-          <RoundToggle icon="🌙" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
-          <RoundToggle icon="🚦" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
-          <RoundToggle icon="🧪" label="Sim" on={settings.sim} onPress={() => a.toggle('sim')} />
-          {!follow ? <RoundToggle icon="🎯" label="Center" on={false} onPress={() => setFollow(true)} /> : null}
+          {minimized ? null : (
+            <>
+              <RoundToggle icon="🔊" label="Voice" on={settings.voice} onPress={() => a.toggle('voice')} />
+              <RoundToggle icon="🌙" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
+              <RoundToggle icon="🚦" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
+              <RoundToggle icon="🧪" label="Sim" on={settings.sim} onPress={() => a.toggle('sim')} />
+            </>
+          )}
         </View>
 
         {/* ── bottom panel ── */}
-        <View style={[styles.bottom, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 10, borderColor: theme.border }]}>
+        <View
+          onLayout={(e) => setPanelH(Math.round(e.nativeEvent.layout.height))}
+          style={[styles.bottom, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 10, borderColor: theme.border }]}
+        >
           {odos.toast ? <ToastBar key={odos.toast.id} text={odos.toast.text} tone={odos.toast.tone} onDone={a.dismissToast} /> : null}
-          {trip ? (
+          <PanelHandle minimized={minimized} onChange={setMinimized} />
+          {minimized ? (
+            <View style={styles.mini}>
+              <Pressable
+                onPress={() => setSheet(trip ? 'trip' : 'dest')}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  trip
+                    ? `Arrive ${clockIn(remainingS)}, ${miles(remainingMi)} to go. Tap for trip details.`
+                    : 'Where to? Search for a destination'
+                }
+                style={styles.miniTrip}
+              >
+                {trip ? (
+                  <Text style={[styles.miniEta, { color: theme.good }]} numberOfLines={1}>
+                    {clockIn(remainingS)}
+                    <Text style={[styles.miniMeta, { color: theme.text }]}> {miles(remainingMi)}</Text>
+                  </Text>
+                ) : (
+                  <Text style={[styles.miniMeta, { color: theme.muted }]}>🔍 Where to?</Text>
+                )}
+              </Pressable>
+              {odos.fuelOutlook ? (
+                <Pressable
+                  onPress={() => setMinimized(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Fuel range ${miles(odos.fuelOutlook.rangeMi)}${odos.fuelOutlook.inBuffer ? ', fuel stop needed' : ''}. Tap to show the menu.`}
+                  style={[
+                    styles.miniFuel,
+                    {
+                      backgroundColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.panel,
+                      borderColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.miniMeta, { color: odos.fuelOutlook.inBuffer ? theme.onAmber : theme.text }]}>
+                    {odos.vehicle?.fuel === 'ev' ? '🔋' : '⛽'} {miles(odos.fuelOutlook.rangeMi)}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+          {!minimized && trip ? (
             <Pressable
               onPress={() => setSheet('trip')}
               accessibilityRole="button"
@@ -188,21 +250,27 @@ function Main() {
               <Text style={{ color: theme.muted, fontSize: 22 }}>⌃</Text>
             </Pressable>
           ) : null}
-          <FuelPanel vehicle={odos.vehicle} outlook={odos.fuelOutlook} onFillUp={a.fillUp} onPickVehicle={() => setSheet('vehicle')} />
-          <View style={styles.actions}>
-            <BigButton icon="🔍" label={trip ? 'Add stop' : 'Where to'} onPress={() => setSheet('dest')} style={styles.action} />
-            <BigButton
-              icon="⛽"
-              label="Gas"
-              tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'plain'}
-              onPress={() => setSheet('gas')}
-              style={styles.action}
-            />
-            <BigButton icon="🛏" label="Rest ≤2h" onPress={() => setSheet('rest')} style={styles.action} />
-            <BigButton icon="📤" label="Share" onPress={a.shareLocation} style={styles.action} />
-            <BigButton icon="📋" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} style={styles.action} />
-          </View>
+          {minimized ? null : (
+            <>
+              <FuelPanel vehicle={odos.vehicle} outlook={odos.fuelOutlook} onFillUp={a.fillUp} onPickVehicle={() => setSheet('vehicle')} />
+              <View style={styles.actions}>
+                <BigButton icon="🔍" label={trip ? 'Add stop' : 'Where to'} onPress={() => setSheet('dest')} style={styles.action} />
+                <BigButton
+                  icon="⛽"
+                  label="Gas"
+                  tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'plain'}
+                  onPress={() => setSheet('gas')}
+                  style={styles.action}
+                />
+                <BigButton icon="🛏" label="Rest ≤2h" onPress={() => setSheet('rest')} style={styles.action} />
+                <BigButton icon="📤" label="Share" onPress={a.shareLocation} style={styles.action} />
+                <BigButton icon="📋" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} style={styles.action} />
+              </View>
+            </>
+          )}
         </View>
+
+        <RecenterButton following={follow} driving={!!trip} bottom={panelH + 12} onPress={() => setFollow(true)} />
 
         {openSheet === 'dest' ? (
           <DestinationSheet
@@ -258,6 +326,45 @@ function Main() {
         />
       </View>
     </ThemeContext.Provider>
+  );
+}
+
+/**
+ * Like Google Maps: a round locate button above the panel, filled in when the map has drifted off
+ * your position. While navigating and off-center it becomes a labeled "Re-center" pill.
+ */
+function RecenterButton({
+  following,
+  driving,
+  bottom,
+  onPress,
+}: {
+  following: boolean;
+  driving: boolean;
+  bottom: number;
+  onPress: () => void;
+}) {
+  const t = useTheme();
+  const pill = driving && !following;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={following ? 'Map is centered on your location' : 'Re-center map on your location'}
+      style={({ pressed }) => [
+        pill ? styles.recenterPill : styles.recenter,
+        {
+          bottom,
+          backgroundColor: following ? t.bg : t.accent,
+          borderColor: following ? t.border : t.accent,
+          opacity: pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      <Text style={{ fontSize: pill ? 18 : 26, color: following ? t.accent : t.onAccent, fontWeight: '900' }}>
+        {pill ? '➤  Re-center' : '◎'}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -317,4 +424,47 @@ const styles = StyleSheet.create({
   tripMeta: { flex: 1, fontSize: 18, fontWeight: '700' },
   actions: { flexDirection: 'row', marginTop: 10, marginHorizontal: -3 },
   action: { flex: 1, marginHorizontal: 3, paddingHorizontal: 2 },
+  mini: { flexDirection: 'row', alignItems: 'center', minHeight: 56 },
+  recenter: {
+    position: 'absolute',
+    right: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  recenterPill: {
+    position: 'absolute',
+    right: 12,
+    minHeight: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  miniTrip: { flex: 1, minHeight: 56, justifyContent: 'center' },
+  miniEta: { fontSize: 24, fontWeight: '900' },
+  miniMeta: { fontSize: 18, fontWeight: '800' },
+  miniFuel: {
+    minHeight: 52,
+    minWidth: 96,
+    borderRadius: 26,
+    borderWidth: 2,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

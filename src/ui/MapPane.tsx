@@ -26,6 +26,8 @@ export function MapPane(props: {
   pin: LngLat | null;
   onLongPress: (coord: LngLat) => void;
   onUserPan: () => void;
+  /** Height of the bottom panel, so the driving camera keeps your position above it. */
+  bottomInset: number;
   /** Rain/snow drawn inside the map scene. */
   weather: Condition | null;
   weatherFx: boolean;
@@ -49,9 +51,14 @@ export function MapPane(props: {
       geometry: { type: 'Point', coordinates: s.coord },
     }));
     if (props.destination) {
-      features.push({ type: 'Feature', properties: { icon: '🏁', label: '' }, geometry: { type: 'Point', coordinates: props.destination } });
+      features.push({
+        type: 'Feature',
+        properties: { icon: '🏁', label: '' },
+        geometry: { type: 'Point', coordinates: props.destination },
+      });
     }
-    if (props.pin) features.push({ type: 'Feature', properties: { icon: '📍', label: 'Pin' }, geometry: { type: 'Point', coordinates: props.pin } });
+    if (props.pin)
+      features.push({ type: 'Feature', properties: { icon: '📍', label: 'Pin' }, geometry: { type: 'Point', coordinates: props.pin } });
     return { type: 'FeatureCollection', features };
   }, [props.stops, props.destination, props.pin]);
 
@@ -74,7 +81,7 @@ export function MapPane(props: {
         followUserMode={driving ? Mapbox.UserTrackingMode.FollowWithCourse : Mapbox.UserTrackingMode.Follow}
         followZoomLevel={driving ? 16 : 13}
         followPitch={driving ? 50 : 0}
-        followPadding={{ paddingBottom: driving ? 260 : 0 }}
+        followPadding={{ paddingBottom: driving ? props.bottomInset : 0 }}
         defaultSettings={{ centerCoordinate: props.fix?.coord ?? [-98.5, 39.8], zoomLevel: props.fix ? 13 : 3.5 }}
       />
       {props.sim && props.fix ? <Mapbox.CustomLocationProvider coordinate={props.fix.coord} heading={props.fix.heading ?? 0} /> : null}
@@ -89,7 +96,15 @@ export function MapPane(props: {
             filter={['in', ['get', 'congestion'], ['literal', ['moderate', 'heavy', 'severe']]]}
             style={{
               lineWidth: ['interpolate', ['linear'], ['zoom'], 8, 1.5, 16, 5],
-              lineColor: ['match', ['get', 'congestion'], 'moderate', CONGESTION_COLORS.moderate, 'heavy', CONGESTION_COLORS.heavy, CONGESTION_COLORS.severe],
+              lineColor: [
+                'match',
+                ['get', 'congestion'],
+                'moderate',
+                CONGESTION_COLORS.moderate,
+                'heavy',
+                CONGESTION_COLORS.heavy,
+                CONGESTION_COLORS.severe,
+              ],
               lineOpacity: 0.8,
             }}
           />
