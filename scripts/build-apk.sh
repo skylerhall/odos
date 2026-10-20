@@ -43,7 +43,8 @@ npx expo prebuild --platform android --clean --no-install
 echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
 say "Building the release APK (first build takes a few minutes)"
-(cd android && ./gradlew assembleRelease)
+# 64-bit ARM only (all modern phones). Set ODOS_ABIS=arm64-v8a,armeabi-v7a for very old phones.
+(cd android && ./gradlew assembleRelease -PreactNativeArchitectures="${ODOS_ABIS:-arm64-v8a}")
 
 APK=android/app/build/outputs/apk/release/app-release.apk
 cp "$APK" ./odos.apk

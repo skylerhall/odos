@@ -69,13 +69,20 @@ jobs:
           name: odos-apk
           path: odos.apk
 
+      # Update the one "apk-latest" release in place (replace the file, move the tag) rather than
+      # delete-and-recreate, and retry each call: a single GitHub API 500 used to fail the build.
       - name: Publish as the latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest odos.apk \
-            --title "ODOS for Android (latest build)" \
-            --notes "Build #${{ github.run_number }} from ${GITHUB_SHA::7}. On your phone: tap odos.apk below, then Install." \
-            --target "$GITHUB_SHA" \
-            --latest
+          retry() { for i in 1 2 3 4; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep $((i * 10)); done; return 1; }
+          NOTES="Build #${{ github.run_number }} from ${GITHUB_SHA::7}. On your phone: tap odos.apk below, then Install."
+          if retry gh release view apk-latest >/dev/null; then
+            git tag -f apk-latest "$GITHUB_SHA"
+            retry git push -f origin refs/tags/apk-latest
+            retry gh release upload apk-latest odos.apk --clobber
+            retry gh release edit apk-latest --notes "$NOTES" --latest
+          else
+            retry gh release create apk-latest odos.apk --title "ODOS for Android (latest build)" \
+              --notes "$NOTES" --target "$GITHUB_SHA" --latest
+          fi
