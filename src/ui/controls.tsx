@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DAY, TOUCH, type Theme } from './theme';
 
@@ -95,24 +95,36 @@ export function Chip(props: { label: string; on?: boolean; onPress: () => void }
   );
 }
 
-/** Bottom sheet built on Modal: big close button, scrollable body. */
+/**
+ * Bottom sheet built on Modal: big close button, scrollable body. It rises above the on-screen
+ * keyboard, and tapping outside it while typing only hides the keyboard (closing would throw away
+ * what was typed).
+ */
 export function Sheet(props: { visible: boolean; title: string; onClose: () => void; children: ReactNode; scroll?: boolean }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const onBackdrop = () => (Keyboard.isVisible() ? Keyboard.dismiss() : props.onClose());
   return (
     <Modal visible={props.visible} animationType="slide" transparent onRequestClose={props.onClose}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay }]} onPress={props.onClose} accessibilityLabel="Close" />
-      <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 12 }]}>
-        <View style={styles.sheetHead}>
-          <Text style={[styles.sheetTitle, { color: t.text }]} accessibilityRole="header">
-            {props.title}
-          </Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={props.onClose} style={[styles.close, { borderColor: t.border }]}>
-            <Text style={{ color: t.text, fontSize: 22, fontWeight: '700' }}>✕</Text>
-          </Pressable>
+      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay }]} onPress={onBackdrop} accessibilityLabel="Close" />
+      <KeyboardAvoidingView behavior="padding" style={styles.sheetHolder} pointerEvents="box-none">
+        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.sheetHead}>
+            <Text style={[styles.sheetTitle, { color: t.text }]} accessibilityRole="header">
+              {props.title}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              onPress={props.onClose}
+              style={[styles.close, { borderColor: t.border }]}
+            >
+              <Text style={{ color: t.text, fontSize: 22, fontWeight: '700' }}>✕</Text>
+            </Pressable>
+          </View>
+          {props.scroll === false ? props.children : <ScrollView keyboardShouldPersistTaps="handled">{props.children}</ScrollView>}
         </View>
-        {props.scroll === false ? props.children : <ScrollView keyboardShouldPersistTaps="handled">{props.children}</ScrollView>}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -175,8 +187,19 @@ const styles = StyleSheet.create({
   },
   roundIcon: { fontSize: 20 },
   roundLabel: { fontSize: 11, fontWeight: '800' },
-  chip: { minHeight: 48, paddingHorizontal: 16, borderRadius: 24, borderWidth: 2, justifyContent: 'center', marginRight: 8, marginBottom: 8 },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16 },
+  chip: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 2,
+    justifyContent: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  // The holder fills the screen and pins the sheet to its bottom edge; KeyboardAvoidingView adds
+  // bottom padding equal to the keyboard, which lifts the sheet above it.
+  sheetHolder: { flex: 1, justifyContent: 'flex-end' },
+  sheet: { maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   sheetTitle: { flex: 1, fontSize: 24, fontWeight: '800' },
   close: { width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

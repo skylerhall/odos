@@ -57,14 +57,21 @@ const detail = (v: Vehicle) =>
     ? `${v.mpg} MPGe · ${Math.round(v.tankGal * KWH_PER_GALLON)} kWh · ~${Math.round(v.mpg * v.tankGal)} mi`
     : `${v.mpg} mpg · ${v.tankGal} gal · ~${Math.round(v.mpg * v.tankGal)} mi`;
 
+// Last search typed, kept while the app is open so reopening the sheet doesn't start over.
+let lastVehicleQuery = '';
+
 function SearchMode({ onPick }: { onPick: (v: Vehicle) => void }) {
   const t = useTheme();
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(lastVehicleQuery);
   const results = useMemo(() => searchVehicles(q), [q]);
   const shown = results.slice(0, 40);
+  const onChange = (s: string) => {
+    lastVehicleQuery = s;
+    setQ(s);
+  };
   return (
     <View>
-      <Input value={q} onChangeText={setQ} placeholder='Try "dodge" or "f150 5.0"' label="Search vehicles" />
+      <Input value={q} onChangeText={onChange} placeholder='Try "dodge" or "f150 5.0"' label="Search vehicles" />
       {q.trim() ? (
         <Text style={{ color: t.muted, fontSize: 15, marginBottom: 4 }}>
           {results.length === 0
