@@ -1,5 +1,27 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
+import {
+  BackHandler,
+  type HostInstance,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DAY, TOUCH, type Theme } from './theme';
 
@@ -96,19 +118,80 @@ export function Chip(props: { label: string; on?: boolean; onPress: () => void }
 }
 
 /**
- * Bottom sheet built on Modal: big close button, scrollable body. It rises above the on-screen
- * keyboard, and tapping outside it while typing only hides the keyboard (closing would throw away
- * what was typed).
+ * Where the on-screen keyboard's top edge is relative to a view: how many pixels of the view the
+ * keyboard covers. Measured from the real keyboard frame, so it is right whether or not Android
+ * resizes the window for the keyboard (edge-to-edge apps don't get resized).
+ */
+function useKeyboardOverlap(ref: RefObject<HostInstance | null>) {
+  const [overlap, setOverlap] = useState(0);
+  const keyboardTop = useRef<number | null>(null);
+
+  const measure = useCallback(() => {
+    const top = keyboardTop.current;
+    if (top == null) return setOverlap(0);
+    ref.current?.measureInWindow((_x, y, _w, h) => setOverlap(Math.max(0, Math.round(y + h - top))));
+  }, [ref]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', (e) => {
+      const { screenY, height } = e.endCoordinates;
+      if (!ref.current || screenY <= 0) {
+        keyboardTop.current = null;
+        setOverlap(height);
+        return;
+      }
+      keyboardTop.current = screenY;
+      measure();
+    });
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => {
+      keyboardTop.current = null;
+      setOverlap(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [ref, measure]);
+
+  // If the window does get resized for the keyboard, re-measure once the new layout lands.
+  return { overlap, onLayout: measure };
+}
+
+/**
+ * Bottom sheet drawn over the app (not a separate Android window, where the keyboard can't be
+ * tracked). It rises above the on-screen keyboard and shrinks to fit the space left, tapping
+ * outside while typing only hides the keyboard (closing would throw away what was typed), and the
+ * Android back button closes it.
  */
 export function Sheet(props: { visible: boolean; title: string; onClose: () => void; children: ReactNode; scroll?: boolean }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
+  const holder = useRef<HostInstance>(null);
+  const { overlap, onLayout } = useKeyboardOverlap(holder);
+  const onClose = useRef(props.onClose);
+  useLayoutEffect(() => {
+    onClose.current = props.onClose;
+  });
+
+  useEffect(() => {
+    if (!props.visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [props.visible]);
+
+  if (!props.visible) return null;
   const onBackdrop = () => (Keyboard.isVisible() ? Keyboard.dismiss() : props.onClose());
+  // Leave room for the status bar above, and the keyboard (or the gesture bar) below.
+  const maxHeight = Math.max(200, screenH - overlap - insets.top - 24);
   return (
-    <Modal visible={props.visible} animationType="slide" transparent onRequestClose={props.onClose}>
+    <View ref={holder} onLayout={onLayout} style={styles.sheetLayer}>
       <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay }]} onPress={onBackdrop} accessibilityLabel="Close" />
-      <KeyboardAvoidingView behavior="padding" style={styles.sheetHolder} pointerEvents="box-none">
-        <View style={[styles.sheet, { backgroundColor: t.bg, paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.sheetHolder, { paddingBottom: overlap }]} pointerEvents="box-none">
+        <View style={[styles.sheet, { maxHeight, backgroundColor: t.bg, paddingBottom: overlap > 0 ? 12 : insets.bottom + 12 }]}>
           <View style={styles.sheetHead}>
             <Text style={[styles.sheetTitle, { color: t.text }]} accessibilityRole="header">
               {props.title}
@@ -124,8 +207,8 @@ export function Sheet(props: { visible: boolean; title: string; onClose: () => v
           </View>
           {props.scroll === false ? props.children : <ScrollView keyboardShouldPersistTaps="handled">{props.children}</ScrollView>}
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </View>
   );
 }
 
@@ -196,10 +279,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  // The holder fills the screen and pins the sheet to its bottom edge; KeyboardAvoidingView adds
-  // bottom padding equal to the keyboard, which lifts the sheet above it.
+  // Covers the whole app, above the map and panels (Android draws higher elevation on top).
+  sheetLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, elevation: 100 },
+  // Pins the sheet to the bottom; bottom padding equal to the keyboard overlap lifts it above.
   sheetHolder: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16 },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   sheetTitle: { flex: 1, fontSize: 24, fontWeight: '800' },
   close: { width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
