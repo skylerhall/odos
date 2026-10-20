@@ -1,7 +1,7 @@
 // Exact vehicle lookup when online: fueleconomy.gov (official EPA data for every US car since 1984)
 // for year → make → model → engine, plus NHTSA vPIC for decoding a VIN.
 
-import { closestRegistryMatch } from '../core/vehicles/match';
+import { closestRegistryMatch, type VehicleQuery } from '../core/vehicles/match';
 import type { FuelKind, Vehicle } from '../core/vehicles/types';
 import { fetchJson, qs } from './http';
 
@@ -23,6 +23,51 @@ export const epaModels = (year: string, make: string) => menu('model', { year, m
 /** Engine/transmission options; each value is an EPA vehicle id. */
 export const epaOptions = (year: string, make: string, model: string) => menu('options', { year, make, model });
 
+export type EpaMatch = { id: string; title: string; detail: string };
+
+const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Exact EPA matches for a typed search like "2007 toyota tundra 4.7": finds the make for that
+ * year, the models whose names contain the other words, then each model's engine options,
+ * keeping only the typed engine size when one was given.
+ */
+export async function epaSearch(q: VehicleQuery): Promise<EpaMatch[]> {
+  if (q.year == null || q.words.length === 0) return [];
+  const year = String(q.year);
+  const words = q.words
+    .filter((w) => w !== q.displacement && w !== `${q.displacement}l`)
+    .map(squash)
+    .filter(Boolean);
+  const makes = await epaMakes(year);
+  const make =
+    makes.find((m) => words.includes(squash(m.text))) ??
+    makes.find((m) => words.some((w) => w.length >= 3 && squash(m.text).startsWith(w)));
+  const rest = make ? words.filter((w) => !squash(make.text).startsWith(w)) : words;
+  // No make typed ("2007 tundra")? Try the makes whose models match, among the common ones.
+  const candidates = make ? [make] : makes.filter((m) => COMMON_MAKES.has(m.text.toLowerCase()));
+  const modelLists = await Promise.all(candidates.map((mk) => epaModels(year, mk.value).catch(() => [] as MenuItem[])));
+  const out: EpaMatch[] = [];
+  for (const [i, mk] of candidates.entries()) {
+    if (out.length >= 12) break;
+    const hits = modelLists[i].filter((m) => rest.length === 0 || rest.every((w) => squash(m.text).includes(w))).slice(0, 4);
+    for (const model of hits) {
+      const options = await epaOptions(year, mk.value, model.value);
+      // Keep the typed engine size, e.g. "4.7" matches "Auto 5-spd, 8 cyl, 4.7 L". If nothing
+      // matches (unexpected wording), show every engine rather than nothing.
+      const sized = q.displacement
+        ? options.filter((o) => new RegExp(`\\b${q.displacement!.replace('.', '\\.')}\\s*L\\b`, 'i').test(o.text))
+        : options;
+      for (const o of sized.length ? sized : options) {
+        out.push({ id: o.value, title: `${year} ${mk.text} ${model.text}`, detail: o.text });
+      }
+    }
+  }
+  return out.slice(0, 12);
+}
+
+const COMMON_MAKES = new Set(['toyota', 'ford', 'chevrolet', 'gmc', 'dodge', 'ram', 'jeep', 'honda', 'nissan', 'subaru', 'hyundai', 'kia']);
+
 type EpaVehicle = {
   id: string;
   year: string;
@@ -42,15 +87,19 @@ export async function epaVehicle(id: string): Promise<Vehicle> {
   const mpg = Number(e.comb08) || 25;
   const displ = e.displ ? Number(e.displ) : undefined;
   const atv = (e.atvType ?? '').toLowerCase();
-  const fuel: FuelKind =
-    atv === 'ev' ? 'ev' : atv.includes('hybrid') ? 'hybrid' : /diesel/i.test(e.fuelType1 ?? '') ? 'diesel' : 'gas';
-  const match = closestRegistryMatch(e.make, e.model, displ);
+  const fuel: FuelKind = atv === 'ev' ? 'ev' : atv.includes('hybrid') ? 'hybrid' : /diesel/i.test(e.fuelType1 ?? '') ? 'diesel' : 'gas';
+  const match = closestRegistryMatch(e.make, e.model, displ, Number(e.year) || undefined);
   // EPA has no tank size. EVs: derive from rated range. Others: borrow from the closest built-in match.
-  const tankGal = fuel === 'ev' && Number(e.range) > 0 ? +(Number(e.range) / mpg).toFixed(2) : match?.tankGal ?? 16;
+  const tankGal = fuel === 'ev' && Number(e.range) > 0 ? +(Number(e.range) / mpg).toFixed(2) : (match?.tankGal ?? 16);
   const engine =
     fuel === 'ev'
       ? `Electric${e.range ? ` · ${e.range} mi range` : ''}`
-      : [displ ? `${displ.toFixed(1)}L` : null, e.cylinders ? `${e.cylinders}-cyl` : null, fuel === 'hybrid' ? 'Hybrid' : null, fuel === 'diesel' ? 'Diesel' : null]
+      : [
+          displ ? `${displ.toFixed(1)}L` : null,
+          e.cylinders ? `${e.cylinders}-cyl` : null,
+          fuel === 'hybrid' ? 'Hybrid' : null,
+          fuel === 'diesel' ? 'Diesel' : null,
+        ]
           .filter(Boolean)
           .join(' ');
   return {

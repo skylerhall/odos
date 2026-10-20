@@ -1,5 +1,6 @@
 // Built-in vehicle list. It works offline and covers the common US makes, models and engines.
-// Figures are representative EPA combined MPG and typical tank sizes for recent model years.
+// Figures are representative EPA combined MPG and typical tank sizes. ROWS are recent model years;
+// OLDER (below) are earlier generations tagged with the years they cover.
 // When online, ODOS looks up the exact year/engine on fueleconomy.gov (see services/vehicleLookup.ts).
 //
 // Row: [make, model, engine, combined MPG (MPGe for EVs), tank gallons (battery kWh for EVs), fuel]
@@ -341,6 +342,106 @@ const ROWS: Row[] = [
   ['Polestar', '2', 'Long Range (82 kWh)', 107, 82, 'ev'],
 ];
 
+// Older generations still on the road, with the model years each entry covers. For anything not
+// here, typing a year in the search also pulls exact matches from the EPA (every car since 1984).
+// Row: [make, model, engine, years, combined MPG, tank gallons, fuel]
+type OldRow = [string, string, string, string, number, number, FuelKind?];
+
+const OLDER: OldRow[] = [
+  // Toyota
+  ['Toyota', 'Tundra', '4.7L V8 i-Force', '2000-2009', 15, 26.4],
+  ['Toyota', 'Tundra', '4.0L V6', '2005-2010', 17, 26.4],
+  ['Toyota', 'Tundra', '5.7L V8 i-Force', '2007-2021', 15, 26.4],
+  ['Toyota', 'Tundra', '4.6L V8', '2010-2019', 16, 26.4],
+  ['Toyota', 'Tacoma', '4.0L V6', '2005-2015', 18, 21.1],
+  ['Toyota', 'Tacoma', '2.7L I4', '2005-2015', 20, 21.1],
+  ['Toyota', 'Tacoma', '3.5L V6', '2016-2023', 20, 21.1],
+  ['Toyota', '4Runner', '4.7L V8', '2003-2009', 16, 23],
+  ['Toyota', '4Runner', '4.0L V6', '2003-2009', 18, 23],
+  ['Toyota', 'Sequoia', '4.7L V8', '2001-2009', 15, 26.4],
+  ['Toyota', 'Sequoia', '5.7L V8', '2008-2022', 14, 26.4],
+  ['Toyota', 'Highlander', '3.5L V6', '2008-2019', 20, 19.2],
+  ['Toyota', 'Camry', '2.4L I4', '2002-2011', 24, 18.5],
+  ['Toyota', 'Camry', '3.5L V6', '2007-2017', 23, 18.5],
+  ['Toyota', 'Corolla', '1.8L I4', '2003-2019', 30, 13.2],
+  ['Toyota', 'RAV4', '2.4L I4', '2006-2012', 24, 15.9],
+  ['Toyota', 'Prius', '1.5L Hybrid', '2004-2009', 46, 11.9, 'hybrid'],
+  ['Toyota', 'Prius', '1.8L Hybrid', '2010-2015', 50, 11.9, 'hybrid'],
+  ['Toyota', 'Sienna', '3.5L V6', '2007-2020', 19, 20],
+  // Ford
+  ['Ford', 'F-150', '5.4L V8 Triton', '2004-2010', 15, 26],
+  ['Ford', 'F-150', '4.6L V8 Triton', '2004-2010', 16, 26],
+  ['Ford', 'F-150', '5.0L V8 Coyote', '2011-2017', 17, 26],
+  ['Ford', 'F-150', '3.5L EcoBoost V6', '2011-2017', 18, 26],
+  ['Ford', 'F-150', '3.7L V6', '2011-2014', 17, 26],
+  ['Ford', 'F-250 Super Duty', '7.3L Power Stroke Diesel', '1999-2003', 15, 38, 'diesel'],
+  ['Ford', 'F-250 Super Duty', '6.0L Power Stroke Diesel', '2003-2007', 15, 38, 'diesel'],
+  ['Ford', 'F-250 Super Duty', '6.4L Power Stroke Diesel', '2008-2010', 13, 38, 'diesel'],
+  ['Ford', 'F-250 Super Duty', '5.4L V8 Triton', '1999-2010', 12, 38],
+  ['Ford', 'F-250 Super Duty', '6.2L V8', '2011-2022', 12, 34],
+  ['Ford', 'Ranger', '4.0L V6', '1998-2011', 17, 19.5],
+  ['Ford', 'Ranger', '2.3L I4', '2001-2011', 23, 17],
+  ['Ford', 'Explorer', '4.0L V6', '2002-2010', 16, 22.5],
+  ['Ford', 'Explorer', '3.5L V6', '2011-2019', 19, 18.6],
+  ['Ford', 'Expedition', '5.4L V8 Triton', '2003-2014', 14, 28],
+  ['Ford', 'Escape', '3.0L V6', '2001-2012', 20, 16.5],
+  ['Ford', 'Mustang', 'GT 4.6L V8', '2005-2010', 17, 16],
+  ['Ford', 'Focus', '2.0L I4', '2008-2018', 28, 13.5],
+  // Chevrolet / GMC
+  ['Chevrolet', 'Silverado 1500', '5.3L V8', '2007-2013', 17, 26],
+  ['Chevrolet', 'Silverado 1500', '4.8L V8', '2007-2013', 16, 26],
+  ['Chevrolet', 'Silverado 1500', '4.3L V6', '2007-2013', 17, 26],
+  ['Chevrolet', 'Silverado 1500', '5.3L V8', '2014-2018', 18, 26],
+  ['Chevrolet', 'Silverado 2500HD', '6.0L V8', '2001-2019', 13, 34],
+  ['Chevrolet', 'Silverado 2500HD', '6.6L Duramax Diesel', '2001-2016', 15, 36, 'diesel'],
+  ['Chevrolet', 'Tahoe', '5.3L V8', '2007-2014', 17, 26],
+  ['Chevrolet', 'Suburban', '5.3L V8', '2007-2014', 17, 31],
+  ['Chevrolet', 'Colorado', '3.7L I5', '2007-2012', 18, 19.6],
+  ['Chevrolet', 'Trailblazer', '4.2L I6', '2002-2009', 16, 22],
+  ['Chevrolet', 'Impala', '3.5L V6', '2006-2013', 21, 17],
+  ['Chevrolet', 'Malibu', '2.4L I4', '2008-2012', 25, 16],
+  ['Chevrolet', 'Equinox', '2.4L I4', '2010-2017', 24, 18.8],
+  ['Chevrolet', 'Cruze', '1.4L Turbo I4', '2011-2019', 30, 15.6],
+  ['GMC', 'Sierra 1500', '5.3L V8', '2007-2013', 17, 26],
+  ['GMC', 'Sierra 2500HD', '6.6L Duramax Diesel', '2001-2016', 15, 36, 'diesel'],
+  ['GMC', 'Yukon', '5.3L V8', '2007-2014', 17, 26],
+  // Dodge / RAM / Jeep / Chrysler
+  ['Dodge', 'Ram 1500', '5.7L V8 HEMI', '2003-2012', 15, 26],
+  ['Dodge', 'Ram 1500', '4.7L V8', '2002-2012', 15, 26],
+  ['Dodge', 'Ram 2500', '5.9L Cummins Diesel', '2003-2007', 17, 34, 'diesel'],
+  ['Dodge', 'Ram 2500', '6.7L Cummins Diesel', '2007-2012', 16, 34, 'diesel'],
+  ['Dodge', 'Dakota', '4.7L V8', '2005-2011', 15, 22],
+  ['Dodge', 'Durango', '4.7L V8', '2004-2009', 14, 27],
+  ['Dodge', 'Grand Caravan', '3.3L V6', '2008-2010', 19, 20],
+  ['Dodge', 'Charger', '3.5L V6', '2006-2010', 20, 18],
+  ['RAM', '1500', '5.7L V8 HEMI', '2013-2018', 17, 26],
+  ['Jeep', 'Grand Cherokee', '4.7L V8', '1999-2009', 15, 20.5],
+  ['Jeep', 'Grand Cherokee', '3.7L V6', '2005-2010', 17, 20.5],
+  ['Jeep', 'Liberty', '3.7L V6', '2002-2012', 17, 19.5],
+  ['Jeep', 'Wrangler', '4.0L I6', '1997-2006', 16, 19],
+  ['Jeep', 'Wrangler', '3.8L V6', '2007-2011', 17, 21],
+  ['Jeep', 'Wrangler', '3.6L V6', '2012-2017', 18, 21],
+  ['Jeep', 'Cherokee', '4.0L I6 (XJ)', '1987-2001', 16, 20],
+  ['Chrysler', 'Town & Country', '3.6L V6', '2011-2016', 20, 20],
+  // Honda / Nissan / others
+  ['Honda', 'Accord', '2.4L I4', '2003-2012', 25, 17.1],
+  ['Honda', 'Accord', '3.5L V6', '2008-2017', 22, 17.2],
+  ['Honda', 'Civic', '1.8L I4', '2006-2015', 29, 13.2],
+  ['Honda', 'CR-V', '2.4L I4', '2007-2016', 24, 15.3],
+  ['Honda', 'Odyssey', '3.5L V6', '2005-2017', 20, 21],
+  ['Honda', 'Pilot', '3.5L V6', '2003-2015', 18, 21],
+  ['Nissan', 'Altima', '2.5L I4', '2007-2018', 27, 20],
+  ['Nissan', 'Frontier', '4.0L V6', '2005-2019', 16, 21],
+  ['Nissan', 'Titan', '5.6L V8', '2004-2015', 14, 28],
+  ['Nissan', 'Xterra', '4.0L V6', '2005-2015', 17, 21],
+  ['Subaru', 'Outback', '2.5L Boxer', '2005-2014', 22, 18.5],
+  ['Subaru', 'Forester', '2.5L Boxer', '2009-2018', 24, 15.9],
+  ['Hyundai', 'Sonata', '2.4L I4', '2006-2014', 25, 18.5],
+  ['Hyundai', 'Elantra', '1.8L I4', '2011-2016', 32, 12.8],
+  ['Volkswagen', 'Jetta', '2.5L I5', '2005-2014', 26, 14.5],
+  ['Volkswagen', 'Jetta', '2.0L TDI Diesel', '2009-2015', 34, 14.5, 'diesel'],
+];
+
 /** Common nicknames and abbreviations people type for a make. */
 export const MAKE_ALIASES: Record<string, string> = {
   chevy: 'Chevrolet',
@@ -357,13 +458,26 @@ export const MAKE_ALIASES: Record<string, string> = {
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-export const REGISTRY: Vehicle[] = ROWS.map(([make, model, engine, mpg, tank, fuel = 'gas']) => ({
-  id: slug(`${make}-${model}-${engine}`),
-  make,
-  model,
-  engine,
-  mpg,
-  tankGal: fuel === 'ev' ? +(tank / KWH_PER_GALLON).toFixed(2) : tank,
-  fuel,
-  source: 'registry',
-}));
+export const REGISTRY: Vehicle[] = [
+  ...ROWS.map(([make, model, engine, mpg, tank, fuel = 'gas']): Vehicle => ({
+    id: slug(`${make}-${model}-${engine}`),
+    make,
+    model,
+    engine,
+    mpg,
+    tankGal: fuel === 'ev' ? +(tank / KWH_PER_GALLON).toFixed(2) : tank,
+    fuel,
+    source: 'registry',
+  })),
+  ...OLDER.map(([make, model, engine, years, mpg, tank, fuel = 'gas']): Vehicle => ({
+    id: slug(`${make}-${model}-${engine}-${years}`),
+    make,
+    model,
+    engine,
+    years,
+    mpg,
+    tankGal: tank,
+    fuel,
+    source: 'registry',
+  })),
+];

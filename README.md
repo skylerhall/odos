@@ -10,7 +10,7 @@ how to send someone your location.
 
 | Feature | How it works |
 |---|---|
-| **Vehicle match** | Type "dodge" and you get every Dodge in the built-in list (about 300 vehicles, works offline). For an exact match, step through the official EPA list (year → make → model → engine) or decode a VIN through NHTSA. You can also type in your own numbers. |
+| **Vehicle match** | Type "dodge" and you get every Dodge in the built-in list (about 390 vehicles, current and older generations, works offline). Add the year, like "2007 tundra 4.7", and the same search also pulls exact matches from the official EPA list of every US vehicle since 1984. You can also decode a VIN through NHTSA, or type in your own numbers. |
 | **Fuel tracking** | Fuel burns as you drive, at your vehicle's EPA MPG, adjusted for speed (efficiency drops above 55 mph). Range is estimated at the pace you'll actually drive on this route, and the app shows how much range you'll have left when you arrive. |
 | **50-mile buffer** | When range drops to 50 miles, ODOS alerts you, searches for gas **15–30 miles ahead on your route**, and adds the best station as a stop automatically. |
 | **One-tap fill-up** | Tap "I just filled up" and the tank resets to full, the auto gas stop is cleared, and ODOS tells you how many miles until the next fuel alert. |

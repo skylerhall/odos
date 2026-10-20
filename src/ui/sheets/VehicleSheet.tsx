@@ -1,9 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
-import { searchVehicles } from '../../core/vehicles/match';
+import { parseVehicleQuery, searchVehicles } from '../../core/vehicles/match';
 import type { FuelKind, Vehicle } from '../../core/vehicles/types';
 import { KWH_PER_GALLON } from '../../core/vehicles/types';
-import { decodeVin, epaMakes, epaModels, epaOptions, epaVehicle, epaYears, vinToOptions, type MenuItem } from '../../services/vehicleLookup';
+import {
+  decodeVin,
+  epaMakes,
+  epaModels,
+  epaOptions,
+  epaSearch,
+  epaVehicle,
+  epaYears,
+  vinToOptions,
+  type MenuItem,
+} from '../../services/vehicleLookup';
 import { BigButton, Chip, ResultRow, Sheet, useTheme } from '../controls';
 import { useAsync } from '../useAsync';
 
@@ -35,7 +45,14 @@ export function VehicleSheet(props: { onClose: () => void; onPick: (v: Vehicle) 
   );
 }
 
-function Input(props: { value: string; onChangeText: (s: string) => void; placeholder: string; label: string; numeric?: boolean; autoCaps?: boolean }) {
+function Input(props: {
+  value: string;
+  onChangeText: (s: string) => void;
+  placeholder: string;
+  label: string;
+  numeric?: boolean;
+  autoCaps?: boolean;
+}) {
   const t = useTheme();
   return (
     <TextInput
@@ -47,7 +64,17 @@ function Input(props: { value: string; onChangeText: (s: string) => void; placeh
       keyboardType={props.numeric ? 'decimal-pad' : 'default'}
       autoCapitalize={props.autoCaps ? 'characters' : 'none'}
       autoCorrect={false}
-      style={{ minHeight: 58, borderWidth: 2, borderColor: t.border, borderRadius: 14, paddingHorizontal: 14, fontSize: 19, color: t.text, backgroundColor: t.panel, marginBottom: 8 }}
+      style={{
+        minHeight: 58,
+        borderWidth: 2,
+        borderColor: t.border,
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        fontSize: 19,
+        color: t.text,
+        backgroundColor: t.panel,
+        marginBottom: 8,
+      }}
     />
   );
 }
@@ -63,25 +90,79 @@ let lastVehicleQuery = '';
 function SearchMode({ onPick }: { onPick: (v: Vehicle) => void }) {
   const t = useTheme();
   const [q, setQ] = useState(lastVehicleQuery);
+  const [settled, setSettled] = useState(lastVehicleQuery);
+  const [picking, setPicking] = useState(false);
+  const [pickError, setPickError] = useState(false);
   const results = useMemo(() => searchVehicles(q), [q]);
   const shown = results.slice(0, 40);
   const onChange = (s: string) => {
     lastVehicleQuery = s;
     setQ(s);
   };
+
+  // With a model year typed, also ask the EPA for exact matches (once typing pauses).
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(q.trim()), 700);
+    return () => clearTimeout(timer);
+  }, [q]);
+  const parsed = useMemo(() => parseVehicleQuery(settled), [settled]);
+  const wantEpa = parsed.year != null && parsed.words.length > 0;
+  const epa = useAsync(wantEpa ? () => epaSearch(parsed) : null, settled);
+
+  const pickEpa = async (id: string) => {
+    setPicking(true);
+    setPickError(false);
+    try {
+      onPick(await epaVehicle(id));
+    } catch {
+      setPickError(true);
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const yearTyped = parseVehicleQuery(q).year != null;
   return (
     <View>
-      <Input value={q} onChangeText={onChange} placeholder='Try "dodge" or "f150 5.0"' label="Search vehicles" />
+      <Input value={q} onChangeText={onChange} placeholder='Try "2007 tundra 4.7" or "dodge"' label="Search vehicles" />
       {q.trim() ? (
         <Text style={{ color: t.muted, fontSize: 15, marginBottom: 4 }}>
           {results.length === 0
-            ? 'No match in the built-in list. Try “Exact year” for every EPA-rated vehicle.'
-            : `${results.length} match${results.length === 1 ? '' : 'es'}${results.length > shown.length ? ` · showing ${shown.length}, add a model or engine to narrow` : ''}`}
+            ? yearTyped
+              ? 'Not in the built-in list. Checking the EPA list below…'
+              : 'Not in the built-in list. Add the year (e.g. “2007 tundra”) to search every EPA-rated vehicle.'
+            : `${results.length} match${results.length === 1 ? '' : 'es'}${results.length > shown.length ? ` · showing ${shown.length}, add a model or engine to narrow` : ''}${
+                yearTyped ? '' : ' · add the year for exact EPA figures'
+              }`}
         </Text>
       ) : null}
       {shown.map((v) => (
-        <ResultRow key={v.id} title={`${v.make} ${v.model}`} subtitle={v.engine} detail={detail(v)} action="Pick" onAction={() => onPick(v)} />
+        <ResultRow
+          key={v.id}
+          title={`${v.make} ${v.model}`}
+          subtitle={v.years ? `${v.years} · ${v.engine}` : v.engine}
+          detail={detail(v)}
+          action="Pick"
+          onAction={() => onPick(v)}
+        />
       ))}
+
+      {wantEpa || (yearTyped && q.trim() !== settled) ? (
+        <View style={{ marginTop: 14 }}>
+          <Text style={{ color: t.muted, fontSize: 15, fontWeight: '800' }}>EXACT MATCHES · EPA (fueleconomy.gov)</Text>
+          {epa.loading || q.trim() !== settled || picking ? <ActivityIndicator color={t.accent} style={{ margin: 12 }} /> : null}
+          {epa.error ? <Text style={{ color: t.danger, fontSize: 16 }}>Couldn’t reach the EPA list. It needs a connection.</Text> : null}
+          {pickError ? <Text style={{ color: t.danger, fontSize: 16 }}>Couldn’t load that vehicle. Try again.</Text> : null}
+          {!epa.loading && epa.data && epa.data.length === 0 && q.trim() === settled ? (
+            <Text style={{ color: t.text, fontSize: 16 }}>
+              No EPA match for “{settled}”. Check the spelling, or try just the year and model.
+            </Text>
+          ) : null}
+          {epa.data?.map((m) => (
+            <ResultRow key={m.id} title={m.title} subtitle={m.detail} action="Pick" onAction={() => pickEpa(m.id)} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -133,7 +214,13 @@ function ExactMode({ onPick }: { onPick: (v: Vehicle) => void }) {
         {`Choose ${step === 'option' ? 'engine' : step}`}
         {crumbs ? <Text style={{ color: t.muted, fontWeight: '600' }}>{`   ${crumbs}`}</Text> : null}
       </Text>
-      {crumbs ? <BigButton label="◀ Back" onPress={() => setPath(step === 'option' ? { year: path.year, make: path.make } : step === 'model' ? { year: path.year } : {})} style={{ marginBottom: 8 }} /> : null}
+      {crumbs ? (
+        <BigButton
+          label="◀ Back"
+          onPress={() => setPath(step === 'option' ? { year: path.year, make: path.make } : step === 'model' ? { year: path.year } : {})}
+          style={{ marginBottom: 8 }}
+        />
+      ) : null}
       {busy ? <ActivityIndicator color={t.accent} style={{ margin: 12 }} /> : null}
       {error ? <Text style={{ color: t.danger, fontSize: 16 }}>{error}</Text> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -199,7 +286,13 @@ function CustomMode({ onPick }: { onPick: (v: Vehicle) => void }) {
         ))}
       </View>
       <Input value={mpg} onChangeText={setMpg} placeholder={ev ? 'MPGe (e.g. 110)' : 'MPG (e.g. 22)'} label="Fuel economy" numeric />
-      <Input value={tank} onChangeText={setTank} placeholder={ev ? 'Battery kWh (e.g. 75)' : 'Tank gallons (e.g. 18)'} label="Tank size" numeric />
+      <Input
+        value={tank}
+        onChangeText={setTank}
+        placeholder={ev ? 'Battery kWh (e.g. 75)' : 'Tank gallons (e.g. 18)'}
+        label="Tank size"
+        numeric
+      />
       <BigButton
         label="Use this vehicle"
         tone="accent"
