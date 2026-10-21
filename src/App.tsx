@@ -14,6 +14,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tankEighths } from './core/fuel';
 import { MI } from './core/geo';
+import { speedLimitAt } from './core/route';
 import { formatCoords } from './core/share';
 import { hasToken } from './services/mapbox';
 import { load, save } from './services/storage';
@@ -23,6 +24,7 @@ import { ActionTile, BigButton, Icon, IconButton, PressScale, Rail, RoundToggle,
 import { clockIn, duration, miles } from './ui/format';
 import { FuelPanel } from './ui/FuelPanel';
 import { ManeuverBanner } from './ui/ManeuverBanner';
+import { Speedometer } from './ui/Speedometer';
 import { MapPane } from './ui/MapPane';
 import { PanelHandle } from './ui/PanelHandle';
 import { DestinationSheet } from './ui/sheets/DestinationSheet';
@@ -102,8 +104,12 @@ function Main() {
   const openSheet: SheetName = sheet ?? (odos.loaded && !odos.vehicle && !firstRunDone ? 'vehicle' : null);
   const closeSheet = () => {
     setSheet(null);
+    setQuickChange(false);
     setFirstRunDone(true);
   };
+  // The "Where to?" sheet was opened from the trip bar: a change to the route while driving.
+  const [quickChange, setQuickChange] = useState(false);
+  const [topH, setTopH] = useState(90);
   // After picking a vehicle, ask how full the tank is instead of assuming full.
   const pickedVehicle = useRef(false);
 
@@ -159,9 +165,23 @@ function Main() {
         <WeatherOverlay cond={wx.shown} isDay={wx.isDay && !settings.night} enabled={wx.fxOn} />
 
         {/* ── top ── */}
-        <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
+        <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none" onLayout={(e) => setTopH(e.nativeEvent.layout.height)}>
           {trip ? (
-            <ManeuverBanner progress={p} lanes={odos.lanes} rerouting={odos.routing} />
+            <>
+              <ManeuverBanner progress={p} lanes={odos.lanes} rerouting={odos.routing} />
+              <TripBar
+                onSearch={() => {
+                  setQuickChange(true);
+                  setSheet('dest');
+                }}
+                original={odos.original?.destination ?? null}
+                onRestore={() => {
+                  setFollow(true);
+                  a.restoreOriginal();
+                }}
+                onEnd={a.endTrip}
+              />
+            </>
           ) : (
             <PressScale
               accessibilityRole="search"
@@ -193,7 +213,10 @@ function Main() {
               <BigButton
                 label="Go"
                 tone="accent"
-                onPress={() => a.navigateTo({ id: `pin:${odos.pin}`, name: 'Dropped pin', coord: odos.pin!, kind: 'custom' })}
+                onPress={() => {
+                  if (trip) a.markQuickChange();
+                  a.navigateTo({ id: `pin:${odos.pin}`, name: 'Dropped pin', coord: odos.pin!, kind: 'custom' });
+                }}
                 style={styles.pinBtn}
               />
               <BigButton icon="bed" label="Rest" onPress={() => setSheet('rest')} style={styles.pinBtn} />
@@ -203,7 +226,7 @@ function Main() {
         </View>
 
         {/* ── side rail of one-tap toggles ── */}
-        <View style={[styles.rail, { top: insets.top + (trip ? 210 : 90) }]} pointerEvents="box-none">
+        <View style={[styles.rail, { top: insets.top + 8 + topH + 10 }]} pointerEvents="box-none">
           {minimized ? null : (
             <Rail>
               <RoundToggle
@@ -313,6 +336,12 @@ function Main() {
           )}
         </View>
 
+        {odos.fix && (trip || odos.fix.mph >= 3) ? (
+          // Bottom-left, above the Mapbox logo; the re-center button is on the right.
+          <View style={[styles.speedo, { bottom: panelH + 56 }]} pointerEvents="none">
+            <Speedometer mph={odos.fix.mph} limit={trip && p ? speedLimitAt(trip, p.along) : null} />
+          </View>
+        ) : null}
         <RecenterButton following={follow} driving={!!trip} bottom={panelH + 12} onPress={() => setFollow(true)} />
 
         {openSheet === 'dest' ? (
@@ -321,11 +350,13 @@ function Main() {
             search={a.search}
             hasTrip={!!trip}
             onGo={(pl) => {
+              if (quickChange) a.markQuickChange();
               setSheet(null);
               setFollow(true);
               a.navigateTo(pl);
             }}
             onAddStop={(pl) => {
+              if (quickChange) a.markQuickChange();
               setSheet(null);
               a.addStop(pl);
             }}
@@ -403,6 +434,64 @@ function Main() {
  * Like Google Maps: a round locate button above the panel, filled in when the map has drifted off
  * your position. While navigating and off-center it becomes a labeled "Re-center" pill.
  */
+/**
+ * Under the turn banner while navigating: search to add a stop or change the destination, go back to
+ * the trip as planned after a quick change, and end navigation (asks for a second tap, so a bump on
+ * a rough road doesn't end the trip).
+ */
+function TripBar(props: { onSearch: () => void; original: { name: string } | null; onRestore: () => void; onEnd: () => void }) {
+  const t = useTheme();
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const timer = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(timer);
+  }, [armed]);
+  return (
+    <View style={styles.tripBar}>
+      <PressScale
+        accessibilityRole="search"
+        accessibilityLabel="Add a stop or change where you're going"
+        onPress={props.onSearch}
+        scaleTo={0.98}
+        style={[styles.tripSearch, { backgroundColor: t.bg }, elevate(t, 2)]}
+      >
+        <Icon name="magnify" size={22} color={t.accent} />
+        <Text style={[styles.tripSearchText, { color: t.muted }]} numberOfLines={1}>
+          Add a stop or reroute
+        </Text>
+      </PressScale>
+      {props.original ? (
+        <PressScale
+          accessibilityRole="button"
+          accessibilityLabel={`Back to your original trip to ${props.original.name}`}
+          onPress={props.onRestore}
+          scaleTo={0.94}
+          style={[styles.tripBtn, { backgroundColor: t.bg }, elevate(t, 2)]}
+        >
+          <Icon name="backup-restore" size={22} color={t.accent} />
+          <Text style={[styles.tripBtnText, { color: t.accent }]}>Original</Text>
+        </PressScale>
+      ) : null}
+      <PressScale
+        accessibilityRole="button"
+        accessibilityLabel={armed ? 'Tap again to end navigation' : 'End navigation'}
+        accessibilityHint={armed ? undefined : 'Tap twice to end the trip'}
+        onPress={() => {
+          if (!armed) return setArmed(true);
+          setArmed(false);
+          props.onEnd();
+        }}
+        scaleTo={0.94}
+        style={[styles.tripBtn, { backgroundColor: armed ? t.danger : t.bg }, elevate(t, 2)]}
+      >
+        <Icon name="close-octagon" size={22} color={armed ? t.onAccent : t.danger} />
+        <Text style={[styles.tripBtnText, { color: armed ? t.onAccent : t.danger }]}>{armed ? 'Tap again' : 'End'}</Text>
+      </PressScale>
+    </View>
+  );
+}
+
 function RecenterButton({
   following,
   driving,
@@ -462,6 +551,11 @@ const styles = StyleSheet.create({
   top: { position: 'absolute', left: 12, right: 12 },
   searchPill: { minHeight: 60, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
   searchText: { fontSize: 19, fontFamily: font('500'), marginLeft: 12, letterSpacing: -0.2 },
+  tripBar: { flexDirection: 'row', marginTop: 8, gap: 8 },
+  tripSearch: { flex: 1, minHeight: 56, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  tripSearchText: { flex: 1, fontSize: 16, fontFamily: font('500'), marginLeft: 8 },
+  tripBtn: { width: 76, minHeight: 56, borderRadius: RADIUS.control, alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
+  tripBtnText: { fontSize: 12, fontFamily: font('700'), marginTop: 2 },
   pinBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,6 +568,7 @@ const styles = StyleSheet.create({
   pinText: { flex: 1, fontSize: 15, fontFamily: font('500'), marginLeft: 8, ...NUMERIC },
   pinBtn: { minWidth: 64, marginLeft: 6, paddingHorizontal: 12 },
   rail: { position: 'absolute', right: 12 },
+  speedo: { position: 'absolute', left: 12 },
   bottom: {
     position: 'absolute',
     left: 0,

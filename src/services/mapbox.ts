@@ -40,7 +40,7 @@ export async function getRoutes(
     voice_instructions: true,
     voice_units: 'imperial',
     banner_instructions: true,
-    annotations: 'congestion,duration,distance',
+    annotations: 'congestion,duration,distance,maxspeed',
     // Prefer routes that continue the way we're already pointing (fewer U-turns on reroute).
     bearings: opts.heading != null ? [`${Math.round(opts.heading)},60`, ...points.slice(1).map(() => '')].join(';') : undefined,
     max_height: opts.limits?.maxHeightM,
@@ -60,7 +60,7 @@ export async function getRoutes(
       return await call('driving-traffic');
     } catch (e) {
       if (e instanceof HttpError && e.status >= 400 && e.status < 500 && e.status !== 401) {
-        params.annotations = 'duration,distance'; // congestion only exists on the traffic profile
+        params.annotations = 'duration,distance,maxspeed'; // congestion only exists on the traffic profile
         return call('driving');
       }
       throw e;
@@ -72,7 +72,7 @@ export async function getRoutes(
     if (!params.exclude || !isRejection(e)) throw e;
     // No toll-free way through these points: take the normal route and let the caller say so.
     params.exclude = undefined;
-    params.annotations = 'congestion,duration,distance';
+    params.annotations = 'congestion,duration,distance,maxspeed';
     return request();
   }
 }

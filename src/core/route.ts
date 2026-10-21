@@ -1,6 +1,6 @@
 // Turns a Mapbox Directions API route into the shape the app navigates with.
 
-import { buildLine, type Line, type LngLat } from './geo';
+import { buildLine, pointAt, type Line, type LngLat } from './geo';
 import type { LaneGuide } from './lanes';
 
 export type Maneuver = { type: string; modifier?: string; instruction: string; location: LngLat };
@@ -34,10 +34,13 @@ export type Route = {
   cruiseMph: number;
   /** True if any stretch of the route is a toll road. */
   tolls: boolean;
+  /** Posted speed limit per line segment, mph; null where Mapbox doesn't know it. */
+  speedLimits: (number | null)[];
 };
 
 // Minimal typing for the parts of the Directions API response we read.
 type ApiLane = { valid: boolean; active?: boolean; indications: string[] };
+type ApiMaxSpeed = { speed?: number; unit?: 'km/h' | 'mph'; unknown?: boolean; none?: boolean };
 type ApiStep = {
   distance: number;
   duration: number;
@@ -50,7 +53,7 @@ export type ApiRoute = {
   distance: number;
   duration: number;
   geometry: { coordinates: LngLat[] };
-  legs: { distance: number; steps: ApiStep[]; annotation?: { congestion?: string[] } }[];
+  legs: { distance: number; steps: ApiStep[]; annotation?: { congestion?: string[]; maxspeed?: ApiMaxSpeed[] } }[];
 };
 
 const LEVELS = new Set(['low', 'moderate', 'heavy', 'severe']);
@@ -63,6 +66,7 @@ export function parseRoute(api: ApiRoute): Route {
   const lanes: LaneSpot[] = [];
   const legEnds: number[] = [];
   const congestion: Congestion[] = [];
+  const speedLimits: (number | null)[] = [];
   let at = 0;
   for (const leg of api.legs) {
     for (const s of leg.steps) {
@@ -93,10 +97,22 @@ export function parseRoute(api: ApiRoute): Route {
     }
     legEnds.push(at);
     for (const c of leg.annotation?.congestion ?? []) congestion.push(LEVELS.has(c) ? (c as Congestion) : 'unknown');
+    for (const m of leg.annotation?.maxspeed ?? []) speedLimits.push(toMph(m));
   }
   const cruiseMph = api.duration > 0 ? (api.distance / api.duration) * 2.23694 : 0;
   const tolls = api.legs.some((leg) => leg.steps.some((s) => s.intersections?.some((i) => i.classes?.includes('toll'))));
-  return { line, distance: line.length, duration: api.duration, steps, lanes, congestion, legEnds, cruiseMph, tolls };
+  return { line, distance: line.length, duration: api.duration, steps, lanes, congestion, legEnds, cruiseMph, tolls, speedLimits };
+}
+
+function toMph(m: ApiMaxSpeed): number | null {
+  if (m.speed == null || m.unknown || m.none) return null;
+  return m.unit === 'km/h' ? Math.round(m.speed * 0.621371) : m.speed;
+}
+
+/** The posted limit where you are on the route (meters along it), if known. */
+export function speedLimitAt(route: Route, along: number): number | null {
+  if (!route.speedLimits.length) return null;
+  return route.speedLimits[pointAt(route.line, along).index] ?? null;
 }
 
 /** Group the route into runs of equal congestion, for drawing a traffic-colored route line. */

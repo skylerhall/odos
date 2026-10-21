@@ -48,6 +48,9 @@ export function useOdos() {
   const [fix, setFix] = useState<Fix | null>(null);
   const [permission, setPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [destination, setDestination] = useState<Place | null>(null);
+  // The trip as it was before the first quick change on the road (a new destination or stop picked
+  // from the top search bar or a dropped pin), so "Original" can put it back.
+  const [original, setOriginal] = useState<{ destination: Place; stops: Stop[] } | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [route, setRoute] = useState<Route | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -176,6 +179,7 @@ export function useOdos() {
   const endTrip = useCallback(() => {
     routeSeq.current++;
     tracker.current = null;
+    setOriginal(null);
     setDestination(null);
     setStops([]);
     setRoute(null);
@@ -184,6 +188,27 @@ export function useOdos() {
     setGas(null);
     setRouting(false);
   }, []);
+
+  /** Call before a quick change on the road; keeps the trip as it was before the first one. */
+  const markQuickChange = useCallback(() => {
+    const { destination: d, stops: s } = live.current;
+    if (!d) return;
+    setOriginal((o) => o ?? { destination: d, stops: s.filter((x) => !x.auto) });
+  }, []);
+
+  const restoreOriginal = useCallback(async () => {
+    const o = original;
+    if (!o) return;
+    tap();
+    setOriginal(null);
+    setDestination(o.destination);
+    setStops(o.stops);
+    setGas(null);
+    bufferHandled.current = false; // the fuel monitor re-plans a gas stop if one is due
+    notify(`Back to your trip to ${o.destination.name}`, 'good');
+    const r = await reroute({ dest: o.destination, stops: o.stops });
+    if (r) speak(`Back to your route to ${o.destination.name}.`);
+  }, [original, notify, reroute, speak]);
 
   const addStop = useCallback(
     async (place: Place, auto = false) => {
@@ -521,6 +546,8 @@ export function useOdos() {
     fix,
     permission,
     destination,
+    /** The trip before the first quick change on the road, or null. */
+    original,
     stops,
     route,
     progress,
@@ -533,6 +560,8 @@ export function useOdos() {
     actions: {
       navigateTo,
       endTrip,
+      markQuickChange,
+      restoreOriginal,
       addStop,
       removeStop,
       setVehicle,

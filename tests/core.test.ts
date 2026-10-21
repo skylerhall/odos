@@ -6,7 +6,7 @@ import { LaneAdvisor, scoreLanes } from '../src/core/lanes';
 import { simulateLanes } from '../src/core/laneSim';
 import { NavTracker } from '../src/core/nav';
 import { insertStop, pickGasStop, withinRestLimit, type Place, type RestOption } from '../src/core/places';
-import { congestionRuns, parseRoute, type ApiRoute } from '../src/core/route';
+import { congestionRuns, parseRoute, speedLimitAt, type ApiRoute } from '../src/core/route';
 import { formatCoords, mapsLink } from '../src/core/share';
 import { closestRegistryMatch, searchVehicles } from '../src/core/vehicles/match';
 import { REGISTRY } from '../src/core/vehicles/registry';
@@ -192,6 +192,24 @@ describe('route parsing + navigation', () => {
     expect(route.cruiseMph).toBeCloseTo(60, 0);
     const runs = congestionRuns(route);
     expect(runs.map((r) => r.level)).toEqual(['low', 'heavy']);
+  });
+
+  it('reads posted speed limits along the route', () => {
+    expect(speedLimitAt(route, 50 * MI)).toBeNull(); // no maxspeed data in this response
+    const withLimits: ApiRoute = {
+      ...api,
+      legs: api.legs.map((leg) => ({
+        ...leg,
+        annotation: {
+          ...leg.annotation,
+          maxspeed: coords.slice(1).map((_, i) => (i < 100 ? { speed: 75, unit: 'mph' as const } : i < 150 ? { speed: 88, unit: 'km/h' as const } : { unknown: true })),
+        },
+      })),
+    };
+    const r = parseRoute(withLimits);
+    expect(speedLimitAt(r, 50 * MI)).toBe(75);
+    expect(speedLimitAt(r, 120 * MI)).toBe(55);
+    expect(speedLimitAt(r, 180 * MI)).toBeNull();
   });
 
   it('flags routes that use toll roads', () => {
