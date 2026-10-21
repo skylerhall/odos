@@ -1,17 +1,21 @@
 import { Text, View } from 'react-native';
 import type { Place, Stop } from '../../core/places';
 import type { OfflineStatus } from '../../services/offline';
-import { BigButton, Chip, ResultRow, Sheet, useTheme } from '../controls';
+import { BigButton, Chip, Icon, ResultRow, Sheet, useTheme } from '../controls';
 import { font } from '../theme';
 
-/** Trip overview: stops (remove any), offline status, Sim speed, end trip. */
+/** Trip overview: stops (remove any), tolls, offline status, drive simulator, end trip. */
 export function TripSheet(props: {
   visible: boolean;
   onClose: () => void;
   destination: Place | null;
   stops: Stop[];
   offline: OfflineStatus;
+  /** Whether the current route uses toll roads; null before a route exists. */
+  tolls: boolean | null;
+  avoidTolls: boolean;
   sim: boolean;
+  onToggleSim: () => void;
   simSpeed: number;
   onSimSpeed: (n: number) => void;
   onRemove: (id: string) => void;
@@ -26,6 +30,18 @@ export function TripSheet(props: {
       ) : (
         <Text style={{ color: t.muted, fontSize: 17, fontFamily: font('400') }}>No trip yet.</Text>
       )}
+      {props.tolls != null ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }} accessible>
+          <Icon name="boom-gate" size={22} color={props.tolls ? t.amber : t.good} />
+          <Text style={{ color: t.text, fontSize: 16, fontFamily: font('600'), marginLeft: 8, flex: 1 }}>
+            {props.tolls
+              ? props.avoidTolls
+                ? 'Uses toll roads: no toll-free route found'
+                : 'Uses toll roads'
+              : 'No toll roads on this route'}
+          </Text>
+        </View>
+      ) : null}
       {props.stops.map((s, i) => (
         <ResultRow
           key={s.id}
@@ -64,8 +80,17 @@ export function TripSheet(props: {
               ? '✓ Offline maps saved along this route'
               : `Offline save failed: ${off.message ?? 'unknown error'}`}
       </Text>
+      {props.destination ? (
+        <BigButton
+          icon="flask-outline"
+          label={props.sim ? 'Simulating the drive' : 'Simulate this drive'}
+          tone={props.sim ? 'accent' : 'soft'}
+          onPress={props.onToggleSim}
+          hint="Moves you along the route without driving, to preview directions"
+        />
+      ) : null}
       {props.sim ? (
-        <View>
+        <View style={{ marginTop: 8 }}>
           <Text style={{ color: t.muted, fontSize: 15, fontFamily: font('600'), marginBottom: 4 }}>SIM SPEED</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {[1, 4, 16, 60].map((n) => (

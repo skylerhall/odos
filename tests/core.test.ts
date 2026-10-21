@@ -194,6 +194,18 @@ describe('route parsing + navigation', () => {
     expect(runs.map((r) => r.level)).toEqual(['low', 'heavy']);
   });
 
+  it('flags routes that use toll roads', () => {
+    expect(route.tolls).toBe(false);
+    const withToll: ApiRoute = {
+      ...api,
+      legs: api.legs.map((leg) => ({
+        ...leg,
+        steps: leg.steps.map((st, i) => (i === 1 ? { ...st, intersections: [{ location: coords[100], classes: ['toll', 'motorway'] }] } : st)),
+      })),
+    };
+    expect(parseRoute(withToll).tolls).toBe(true);
+  });
+
   it('tracks progress, speaks prompts once, shows lanes ahead, detects off-route', () => {
     const nav = new NavTracker(route);
     expect(nav.update(mileAt(0)).speak).toEqual(['Head east on I-70']);

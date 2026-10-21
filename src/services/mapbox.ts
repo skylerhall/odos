@@ -14,12 +14,22 @@ export function hasToken(): boolean {
 
 export type VehicleLimits = { maxHeightM?: number; maxWidthM?: number; maxWeightT?: number };
 
+/** Mapbox turned the request down (bad input, or no route exists), as opposed to no connection. */
+function isRejection(e: unknown): boolean {
+  if (e instanceof HttpError) return e.status >= 400 && e.status < 500 && e.status !== 401;
+  return e instanceof Error && !(e instanceof TypeError) && e.name !== 'AbortError';
+}
+
 /**
  * Route through the given points (start, stops…, destination). Uses the live-traffic profile and
  * asks for lane data, voice prompts and per-segment congestion. Falls back to the plain driving
- * profile if the traffic profile rejects the request (e.g. too many stops).
+ * profile if the traffic profile rejects the request (e.g. too many stops). With avoidTolls, asks
+ * for toll-free routes; if none exists, returns the normal routes (check Route.tolls).
  */
-export async function getRoutes(points: LngLat[], opts: { limits?: VehicleLimits; heading?: number } = {}): Promise<Route[]> {
+export async function getRoutes(
+  points: LngLat[],
+  opts: { limits?: VehicleLimits; heading?: number; avoidTolls?: boolean } = {},
+): Promise<Route[]> {
   const path = points.map((p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join(';');
   const params = {
     access_token: MAPBOX_TOKEN,
@@ -36,6 +46,7 @@ export async function getRoutes(points: LngLat[], opts: { limits?: VehicleLimits
     max_height: opts.limits?.maxHeightM,
     max_width: opts.limits?.maxWidthM,
     max_weight: opts.limits?.maxWeightT,
+    exclude: opts.avoidTolls ? 'toll' : undefined,
   };
   const call = async (profile: string) => {
     const data = await fetchJson<{ code: string; message?: string; routes: ApiRoute[] }>(
@@ -44,14 +55,25 @@ export async function getRoutes(points: LngLat[], opts: { limits?: VehicleLimits
     if (data.code !== 'Ok' || !data.routes?.length) throw new Error(data.message ?? data.code ?? 'No route');
     return data.routes.map(parseRoute);
   };
-  try {
-    return await call('driving-traffic');
-  } catch (e) {
-    if (e instanceof HttpError && e.status >= 400 && e.status < 500 && e.status !== 401) {
-      params.annotations = 'duration,distance'; // congestion only exists on the traffic profile
-      return call('driving');
+  const request = async () => {
+    try {
+      return await call('driving-traffic');
+    } catch (e) {
+      if (e instanceof HttpError && e.status >= 400 && e.status < 500 && e.status !== 401) {
+        params.annotations = 'duration,distance'; // congestion only exists on the traffic profile
+        return call('driving');
+      }
+      throw e;
     }
-    throw e;
+  };
+  try {
+    return await request();
+  } catch (e) {
+    if (!params.exclude || !isRejection(e)) throw e;
+    // No toll-free way through these points: take the normal route and let the caller say so.
+    params.exclude = undefined;
+    params.annotations = 'congestion,duration,distance';
+    return request();
   }
 }
 

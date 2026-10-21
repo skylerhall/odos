@@ -32,6 +32,8 @@ export type Route = {
   legEnds: number[];
   /** Average moving speed over the route, mph. Feeds the realistic-range estimate. */
   cruiseMph: number;
+  /** True if any stretch of the route is a toll road. */
+  tolls: boolean;
 };
 
 // Minimal typing for the parts of the Directions API response we read.
@@ -41,7 +43,7 @@ type ApiStep = {
   duration: number;
   name: string;
   maneuver: { type: string; modifier?: string; instruction: string; location: LngLat };
-  intersections?: { location: LngLat; lanes?: ApiLane[] }[];
+  intersections?: { location: LngLat; lanes?: ApiLane[]; classes?: string[] }[];
   voiceInstructions?: { distanceAlongGeometry: number; announcement: string }[];
 };
 export type ApiRoute = {
@@ -93,7 +95,8 @@ export function parseRoute(api: ApiRoute): Route {
     for (const c of leg.annotation?.congestion ?? []) congestion.push(LEVELS.has(c) ? (c as Congestion) : 'unknown');
   }
   const cruiseMph = api.duration > 0 ? (api.distance / api.duration) * 2.23694 : 0;
-  return { line, distance: line.length, duration: api.duration, steps, lanes, congestion, legEnds, cruiseMph };
+  const tolls = api.legs.some((leg) => leg.steps.some((s) => s.intersections?.some((i) => i.classes?.includes('toll'))));
+  return { line, distance: line.length, duration: api.duration, steps, lanes, congestion, legEnds, cruiseMph, tolls };
 }
 
 /** Group the route into runs of equal congestion, for drawing a traffic-colored route line. */

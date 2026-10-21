@@ -24,7 +24,7 @@ import { findRest, type RestKind } from '../services/rest';
 import { load, save } from '../services/storage';
 import { duration as fmtDuration, miles as fmtMiles } from '../ui/format';
 
-export type Settings = { voice: boolean; night: boolean; traffic: boolean; sim: boolean; simSpeed: number };
+export type Settings = { voice: boolean; night: boolean; traffic: boolean; avoidTolls: boolean; sim: boolean; simSpeed: number };
 export type Fix = { coord: LngLat; heading: number | null; mph: number; accuracy: number | null; at: number };
 export type Toast = { id: number; text: string; tone: 'info' | 'amber' | 'good' | 'danger' };
 export type LaneView = {
@@ -35,7 +35,7 @@ export type LaneView = {
   simulated: boolean;
 };
 
-const DEFAULT_SETTINGS: Settings = { voice: true, night: false, traffic: true, sim: false, simSpeed: 4 };
+const DEFAULT_SETTINGS: Settings = { voice: true, night: false, traffic: true, avoidTolls: false, sim: false, simSpeed: 4 };
 /** Where Sim mode starts when there's no GPS fix yet (downtown Denver). */
 const SIM_START: LngLat = [-104.9903, 39.7392];
 
@@ -111,9 +111,10 @@ export function useOdos() {
 
   // ── routing ──
   const reroute = useCallback(
-    async (next: { dest?: Place | null; stops?: Stop[] } = {}): Promise<Route | null> => {
+    async (next: { dest?: Place | null; stops?: Stop[]; avoidTolls?: boolean } = {}): Promise<Route | null> => {
       const dest = next.dest !== undefined ? next.dest : live.current.destination;
       const via = next.stops ?? live.current.stops;
+      const avoidTolls = next.avoidTolls ?? live.current.settings.avoidTolls;
       const here = live.current.fix;
       if (!dest) return null;
       if (!hasToken()) {
@@ -124,9 +125,16 @@ export function useOdos() {
       const seq = ++routeSeq.current;
       setRouting(true);
       try {
-        const routes = await getRoutes([from, ...via.map((s) => s.coord), dest.coord], { heading: here?.heading ?? undefined });
+        const routes = await getRoutes([from, ...via.map((s) => s.coord), dest.coord], {
+          heading: here?.heading ?? undefined,
+          avoidTolls,
+        });
         if (seq !== routeSeq.current) return null; // a newer request superseded this one
         const r = routes[0];
+        // Always answer a new trip or a flipped toggle; on automatic reroutes, say it once, not on
+        // every reroute along the same toll road.
+        const asked = next.dest !== undefined || next.avoidTolls !== undefined;
+        if (avoidTolls && r.tolls && (asked || !live.current.route?.tolls)) notify('No toll-free route here, so this route uses tolls', 'danger');
         tracker.current = new NavTracker(r);
         simAlong.current = 0;
         setRoute(r);
@@ -451,6 +459,19 @@ export function useOdos() {
     if (key === 'voice') Speech.stop();
   }, []);
 
+  // Takes effect on the current trip right away, rerouting with or without toll roads.
+  const toggleTolls = useCallback(() => {
+    tap();
+    const avoidTolls = !live.current.settings.avoidTolls;
+    setSettings((s) => ({ ...s, avoidTolls }));
+    if (live.current.destination) {
+      notify(avoidTolls ? 'Avoiding tolls. Rerouting…' : 'Toll roads allowed. Rerouting…');
+      void reroute({ avoidTolls });
+    } else {
+      notify(avoidTolls ? 'Routes will avoid toll roads' : 'Routes may use toll roads');
+    }
+  }, [notify, reroute]);
+
   const dismissToast = useCallback(() => setToast(null), []);
 
   const setSimSpeed = useCallback((simSpeed: number) => setSettings((s) => ({ ...s, simSpeed })), []);
@@ -490,6 +511,7 @@ export function useOdos() {
       shareLocation,
       copyCoords,
       toggle,
+      toggleTolls,
       setSimSpeed,
       searchRest,
       search,

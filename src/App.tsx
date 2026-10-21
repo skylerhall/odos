@@ -210,7 +210,7 @@ function Main() {
               />
               <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
               <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
-              <RoundToggle icon="flask-outline" label="Sim" on={settings.sim} onPress={() => a.toggle('sim')} />
+              <RoundToggle icon="boom-gate" label="No tolls" on={settings.avoidTolls} onPress={a.toggleTolls} />
             </Rail>
           )}
         </View>
@@ -351,7 +351,10 @@ function Main() {
           destination={odos.destination}
           stops={odos.stops}
           offline={odos.offline}
+          tolls={odos.route?.tolls ?? null}
+          avoidTolls={settings.avoidTolls}
           sim={settings.sim}
+          onToggleSim={() => a.toggle('sim')}
           simSpeed={settings.simSpeed}
           onSimSpeed={a.setSimSpeed}
           onRemove={a.removeStop}
