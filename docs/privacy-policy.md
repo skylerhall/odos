@@ -2,7 +2,7 @@
 
 **Effective date:** October 21, 2026
 **App:** ODOS (Android package `com.skylerhall.odos`)
-**Developer:** Egghead Development. Contact: [open an issue](https://github.com/skylerhall/odos-privacy/issues)
+**Developer:** Egghead Development. Contact: skylerchall@gmail.com
 **Published at:** https://skylerhall.github.io/odos-privacy/ (from the public skylerhall/odos-privacy repo; update both together)
 
 ODOS is a navigation app. This policy explains what information the app uses, where it goes, and the
@@ -81,4 +81,4 @@ ODOS is a driving app for adults and is not directed at children under 13.
 If this policy changes, the new version will be posted at this address with a new effective date.
 
 ## Contact
-Questions or requests: [open an issue on GitHub](https://github.com/skylerhall/odos-privacy/issues).
+Questions or requests: skylerchall@gmail.com
