@@ -179,21 +179,33 @@ export function Rail({ children }: { children: ReactNode }) {
 }
 
 /** One on/off toggle inside the Rail. Reads as "Voice, switch, on" to screen readers. */
-export function RoundToggle(props: { icon: IconName; label: string; on: boolean; onPress: () => void }) {
+export function RoundToggle(props: {
+  icon: IconName;
+  label: string;
+  on: boolean;
+  onPress: () => void;
+  /** Strike the icon through (e.g. tolls avoided). */
+  slash?: boolean;
+  /** Spoken name when it differs from the label shown (which may change with the state). */
+  a11yLabel?: string;
+}) {
   const t = useTheme();
+  const color = props.on ? t.brandText : t.muted;
+  const wellBg = props.on ? t.brandSoft : t.bg;
   return (
     <PressScale
       accessibilityRole="switch"
-      accessibilityLabel={props.label}
+      accessibilityLabel={props.a11yLabel ?? props.label}
       accessibilityState={{ checked: props.on }}
       onPress={props.onPress}
       scaleTo={0.9}
       style={styles.toggle}
     >
       <View style={[styles.toggleWell, { backgroundColor: props.on ? t.brandSoft : 'transparent' }]}>
-        <Icon name={props.icon} size={24} color={props.on ? t.brandText : t.muted} />
+        <Icon name={props.icon} size={24} color={color} />
+        {props.slash ? <View style={[styles.slash, { backgroundColor: color, borderColor: wellBg }]} /> : null}
       </View>
-      <Text style={[styles.toggleLabel, { color: props.on ? t.brandText : t.muted }]}>{props.label}</Text>
+      <Text style={[styles.toggleLabel, { color }]}>{props.label}</Text>
     </PressScale>
   );
 }
@@ -395,6 +407,8 @@ const styles = StyleSheet.create({
   rail: { borderRadius: RADIUS.card, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center' },
   toggle: { width: TOUCH + 8, minHeight: TOUCH + 4, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
   toggleWell: { width: 44, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  // A "not" slash from top-left to bottom-right, edged in the well color so it reads over the icon.
+  slash: { position: 'absolute', width: 32, height: 5, borderRadius: 2.5, borderWidth: 1.5, transform: [{ rotate: '45deg' }] },
   toggleLabel: { fontSize: 11, fontFamily: font('600'), marginTop: 2, letterSpacing: 0.2 },
   chip: {
     minHeight: 48,

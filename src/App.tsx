@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tankEighths } from './core/fuel';
 import { MI } from './core/geo';
@@ -44,6 +44,8 @@ import { DAY, elevate, font, NIGHT, NUMERIC, RADIUS } from './ui/theme';
 // Keep the dark logo splash up until saved settings and fonts are loaded, then fade it out.
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ fade: true, duration: 300 });
+
+const RECENTER_SIZE = 58;
 
 type SheetName = 'dest' | 'vehicle' | 'fuel' | 'fuelAsk' | 'rest' | 'gas' | 'trip' | 'weather' | 'trail' | null;
 
@@ -115,6 +117,13 @@ function Main() {
   // The "Where to?" sheet was opened from the trip bar: a change to the route while driving.
   const [quickChange, setQuickChange] = useState(false);
   const [topH, setTopH] = useState(90);
+  // The side rail and the re-center button share the right edge; on short screens or with a tall
+  // panel they'd overlap, so the button moves to the left of the rail.
+  const [rail, setRail] = useState({ w: 72, h: 0 });
+  const { height: screenH } = useWindowDimensions();
+  const railTop = insets.top + 8 + topH + 10;
+  const recenterTop = screenH - (panelH + 12) - RECENTER_SIZE;
+  const recenterBesideRail = rail.h > 0 && railTop + rail.h + 8 > recenterTop;
   // After picking a vehicle, ask how full the tank is instead of assuming full.
   const pickedVehicle = useRef(false);
 
@@ -241,7 +250,11 @@ function Main() {
         </View>
 
         {/* ── side rail of one-tap toggles ── */}
-        <View style={[styles.rail, { top: insets.top + 8 + topH + 10 }]} pointerEvents="box-none">
+        <View
+          style={[styles.rail, { top: railTop }]}
+          pointerEvents="box-none"
+          onLayout={(e) => setRail({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+        >
           {minimized ? null : (
             <Rail>
               <RoundToggle
@@ -252,7 +265,14 @@ function Main() {
               />
               <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
               <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
-              <RoundToggle icon="boom-gate" label="No tolls" on={settings.avoidTolls} onPress={a.toggleTolls} />
+              <RoundToggle
+                icon="boom-gate"
+                label={settings.avoidTolls ? 'No tolls' : 'Tolls'}
+                a11yLabel="Avoid tolls"
+                slash={settings.avoidTolls}
+                on={settings.avoidTolls}
+                onPress={a.toggleTolls}
+              />
             </Rail>
           )}
         </View>
@@ -364,7 +384,14 @@ function Main() {
             <Speedometer mph={odos.fix.mph} limit={trip && p ? speedLimitAt(trip, p.along) : null} />
           </View>
         ) : null}
-        <RecenterButton following={follow} driving={!!trip} bottom={panelH + 12} onPress={() => setFollow(true)} />
+        <RecenterButton
+          following={follow}
+          driving={!!trip}
+          bottom={panelH + 12}
+          right={recenterBesideRail ? 12 + rail.w + 10 : 14}
+          compact={recenterBesideRail}
+          onPress={() => setFollow(true)}
+        />
 
         {openSheet === 'dest' ? (
           <DestinationSheet
@@ -525,22 +552,27 @@ function RecenterButton({
   following,
   driving,
   bottom,
+  right,
+  compact,
   onPress,
 }: {
   following: boolean;
   driving: boolean;
   bottom: number;
+  right: number;
+  /** Round button only (no "Re-center" pill), when it has to sit beside the toggle rail. */
+  compact: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
-  const pill = driving && !following;
+  const pill = driving && !following && !compact;
   return (
     <PressScale
       onPress={onPress}
       scaleTo={0.9}
       accessibilityRole="button"
       accessibilityLabel={following ? 'Map is centered on your location' : 'Re-center map on your location'}
-      style={[pill ? styles.recenterPill : styles.recenter, { bottom, backgroundColor: following ? t.bg : t.accent }, elevate(t, 2)]}
+      style={[pill ? styles.recenterPill : styles.recenter, { bottom, right, backgroundColor: following ? t.bg : t.accent }, elevate(t, 2)]}
     >
       <Icon name={pill ? 'navigation-variant' : 'crosshairs-gps'} size={pill ? 22 : 26} color={following ? t.accent : t.onAccent} />
       {pill ? <Text style={[styles.recenterLabel, { color: t.onAccent }]}>Re-center</Text> : null}
@@ -625,10 +657,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recenter: { position: 'absolute', right: 14, width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
+  recenter: {
+    position: 'absolute',
+    width: RECENTER_SIZE,
+    height: RECENTER_SIZE,
+    borderRadius: RECENTER_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   recenterPill: {
     position: 'absolute',
-    right: 14,
     minHeight: 56,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 20,
