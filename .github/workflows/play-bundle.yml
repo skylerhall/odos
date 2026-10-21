@@ -1,0 +1,110 @@
+# Builds the Google Play upload bundle (.aab), signed with ODOS's key. Run it by hand:
+# Actions → "Google Play bundle" → Run workflow. The bundle lands at Releases → "ODOS for Google Play".
+name: Google Play bundle
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: play-bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+      EXPO_PUBLIC_RIDB_KEY: ${{ secrets.RIDB_KEY }}
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Require the Mapbox token
+        if: env.EXPO_PUBLIC_MAPBOX_TOKEN == ''
+        run: |
+          echo "::error::MAPBOX_TOKEN secret is not set; a Play build without it would show no map."
+          exit 1
+
+      - run: npm ci
+
+      - name: Tests, types, lint
+        run: |
+          npm test
+          npm run typecheck
+          npm run lint
+
+      # Same scheme as android-apk.yml, so Play bundles and sideloaded APKs never reuse a version code.
+      - name: Set the version code
+        run: echo "ODOS_VERSION_CODE=$(( ($(date -u +%s) - 1767225600) / 60 ))" >> "$GITHUB_ENV"
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Load the release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: scripts/ci/load-signing-key.sh --require
+
+      # Unlike the sideload APK, the bundle carries 32- and 64-bit ARM plus x86_64 (Chromebooks).
+      # Play delivers each device only its own slice, so download size stays the same.
+      - name: Build release bundle
+        working-directory: android
+        env:
+          ODOS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ODOS_KEY_ALIAS: odos
+        run: ./gradlew bundleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
+
+      - name: Remove the signing key from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/odos-release.keystore"
+
+      - name: Collect bundle
+        run: cp android/app/build/outputs/bundle/release/app-release.aab odos.aab
+
+      - name: Check which key signed the bundle
+        run: |
+          CERT=$(keytool -printcert -jarfile odos.aab)
+          echo "$CERT" | grep -E 'Owner:|SHA256:'
+          if ! echo "$CERT" | grep -q 'CN=ODOS'; then
+            echo "::error::The bundle isn't signed with ODOS's key."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: odos-aab
+          path: odos.aab
+
+      # Its own pre-release, so the sideload APK stays the repo's "latest" release.
+      - name: Publish the bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          retry() { for i in 1 2 3 4; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep $((i * 10)); done; return 1; }
+          NOTES="Version code $ODOS_VERSION_CODE, built from ${GITHUB_SHA::7}. Upload odos.aab in Play Console (Test and release → a testing track → Create new release). Not installable directly; for your phone use the APK release."
+          if retry gh release view play-bundle >/dev/null; then
+            git tag -f play-bundle "$GITHUB_SHA"
+            retry git push -f origin refs/tags/play-bundle
+            retry gh release upload play-bundle odos.aab --clobber
+            retry gh release edit play-bundle --notes "$NOTES" --prerelease --latest=false
+          else
+            retry gh release create play-bundle odos.aab --title "ODOS for Google Play (upload bundle)" \
+              --notes "$NOTES" --target "$GITHUB_SHA" --prerelease --latest=false
+          fi

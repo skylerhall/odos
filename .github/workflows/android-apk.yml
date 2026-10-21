@@ -23,7 +23,6 @@ jobs:
       # shows a "add your Mapbox token" screen instead of the map.
       EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
       EXPO_PUBLIC_RIDB_KEY: ${{ secrets.RIDB_KEY }}
-      ODOS_VERSION_CODE: ${{ github.run_number }}
       EXPO_NO_TELEMETRY: 1
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +51,11 @@ jobs:
           npm run typecheck
           npm run lint
 
+      # Minutes since 2026-01-01 UTC: always increasing, and shared with the Play workflow (each
+      # workflow has its own run numbers), so every APK and Play bundle installs as an update.
+      - name: Set the version code
+        run: echo "ODOS_VERSION_CODE=$(( ($(date -u +%s) - 1767225600) / 60 ))" >> "$GITHUB_ENV"
+
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
 
@@ -63,22 +67,7 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::warning::ANDROID_KEYSTORE_BASE64 secret is not set. This APK is signed with the shared debug key."
-            exit 0
-          fi
-          if [ -z "$KEYSTORE_PASSWORD" ]; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 is set but ANDROID_KEYSTORE_PASSWORD is not."
-            exit 1
-          fi
-          KEYSTORE="$RUNNER_TEMP/odos-release.keystore"
-          printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$KEYSTORE"
-          if ! keytool -list -keystore "$KEYSTORE" -storepass "$KEYSTORE_PASSWORD" -alias odos >/dev/null; then
-            echo "::error::Couldn't open the signing key: check that both secrets were pasted in full."
-            exit 1
-          fi
-          echo "ODOS_KEYSTORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
+        run: scripts/ci/load-signing-key.sh
 
       # Only 64-bit ARM (every Android phone from roughly 2017 on). Packaging all four CPU types
       # made the APK ~150 MB; this keeps it to about a third of that.
@@ -118,7 +107,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           retry() { for i in 1 2 3 4; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep $((i * 10)); done; return 1; }
-          NOTES="Build #${{ github.run_number }} from ${GITHUB_SHA::7}. On your phone: tap odos.apk below, then Install."
+          NOTES="Build #${{ github.run_number }} (version code $ODOS_VERSION_CODE) from ${GITHUB_SHA::7}. On your phone: tap odos.apk below, then Install."
           if retry gh release view apk-latest >/dev/null; then
             git tag -f apk-latest "$GITHUB_SHA"
             retry git push -f origin refs/tags/apk-latest
