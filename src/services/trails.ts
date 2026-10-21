@@ -6,7 +6,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { STYLE, TRAIL } from '../config';
 import { destinationPoint, haversine, milesToMeters, type BBox, type LngLat } from '../core/geo';
 import { parseOverpass, trailQuery, type TrailArea } from '../core/trails';
-import { fetchJson } from './http';
+import { fetchJson, OVERPASS_HEADERS } from './http';
 import { hasToken } from './mapbox';
 import { load, save } from './storage';
 
@@ -69,7 +69,7 @@ export async function downloadTrailArea(center: LngLat, radiusMi: number, onProg
     try {
       json = await fetchJson(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: OVERPASS_HEADERS,
         body: `data=${encodeURIComponent(trailQuery(center, radiusM))}`,
         timeoutMs: 150000,
       });

@@ -3,7 +3,7 @@
 import { REST, RIDB_KEY } from '../config';
 import { MI, type LngLat } from '../core/geo';
 import { estimateDrive, withinRestLimit, type Place, type RestOption } from '../core/places';
-import { fetchJson, qs } from './http';
+import { fetchJson, OVERPASS_HEADERS, qs } from './http';
 import { dedupe, driveTimes, hasToken, searchCategory } from './mapbox';
 
 export type RestKind = 'hotel' | 'camp' | 'freepark';
@@ -35,7 +35,7 @@ async function freeParking(at: LngLat, radiusM: number): Promise<Place[]> {
   );out center 80;`;
   const data = await fetchJson<{ elements: OsmElement[] }>('https://overpass-api.de/api/interpreter', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: OVERPASS_HEADERS,
     body: `data=${encodeURIComponent(query)}`,
     timeoutMs: 20000,
   });

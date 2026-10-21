@@ -4,6 +4,7 @@
 import { expect, it } from 'vitest';
 import { haversine, type LngLat } from '../../src/core/geo';
 import { buildGraph, parseOverpass, routeOnTrails, trailQuery } from '../../src/core/trails';
+import { OVERPASS_HEADERS } from '../../src/services/http';
 
 const CHAUTAUQUA: LngLat = [-105.2925, 39.999]; // trailhead in Boulder, CO
 const RADIUS = 1500;
@@ -11,7 +12,7 @@ const RADIUS = 1500;
 it('downloads, parses and routes real trails', async () => {
   const res = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: OVERPASS_HEADERS,
     body: `data=${encodeURIComponent(trailQuery(CHAUTAUQUA, RADIUS))}`,
   });
   const text = await res.text();

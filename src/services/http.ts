@@ -27,6 +27,16 @@ export async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?
   }
 }
 
+/**
+ * Headers for the public OpenStreetMap Overpass servers. They turn away requests that don't say which
+ * app is asking (HTTP 406), and their usage policy asks for a way to get in touch.
+ */
+export const OVERPASS_HEADERS = {
+  'Content-Type': 'application/x-www-form-urlencoded',
+  Accept: 'application/json',
+  'User-Agent': 'ODOS-navigation/0.1 (+https://skylerhall.github.io/odos-privacy/)',
+};
+
 export const qs = (params: Record<string, string | number | boolean | undefined>) =>
   Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== '')
