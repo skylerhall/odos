@@ -4,6 +4,7 @@ import type { GasPick, Place } from '../../core/places';
 import type { GasPlan } from '../../services/gas';
 import { ResultRow, Sheet, useTheme } from '../controls';
 import { useAsync } from '../useAsync';
+import { font } from '../theme';
 
 /**
  * Gas along the route, best first. Window matches (15–30 mi ahead, on the route) are flagged.
@@ -19,13 +20,19 @@ export function GasSheet(props: { onClose: () => void; find: () => Promise<GasPl
   return (
     <Sheet visible title="Gas" onClose={props.onClose}>
       {loading ? <ActivityIndicator color={t.accent} style={{ margin: 16 }} /> : null}
-      {plan?.offline ? <Text style={{ color: t.amber, fontSize: 15, fontWeight: '700' }}>No signal: showing stations saved for this trip.</Text> : null}
-      {!loading && plan && plan.options.length === 0 ? <Text style={{ color: t.text, fontSize: 17 }}>No stations found ahead within your range.</Text> : null}
-      {!loading && !plan ? <Text style={{ color: t.text, fontSize: 17 }}>Waiting for GPS…</Text> : null}
+      {plan?.offline ? (
+        <Text style={{ color: t.amber, fontSize: 15, fontFamily: font('600') }}>No signal: showing stations saved for this trip.</Text>
+      ) : null}
+      {!loading && plan && plan.options.length === 0 ? (
+        <Text style={{ color: t.text, fontSize: 17, fontFamily: font('400') }}>No stations found ahead within your range.</Text>
+      ) : null}
+      {!loading && !plan ? <Text style={{ color: t.text, fontSize: 17, fontFamily: font('400') }}>Waiting for GPS…</Text> : null}
       {plan?.options.map((g) => (
         <ResultRow
           key={g.place.id}
-          title={`⛽ ${g.place.name}`}
+          title={g.place.name}
+          icon="gas-station"
+          iconTone={g.inWindow ? 'amber' : 'accent'}
           subtitle={g.place.address}
           detail={label(g)}
           action="+ Add"

@@ -37,9 +37,7 @@ export async function planGasStop(route: Route, alongMeters: number, rangeMi: nu
 
 function rankAll(stations: Place[], route: Line, along: number, win: { fromMi: number; toMi: number }, rangeMi: number): GasPick[] {
   // Rank each station on its own, then list window matches first.
-  const picks = stations
-    .map((s) => pickGasStop([s], route, along, win, rangeMi))
-    .filter((p): p is GasPick => p != null);
+  const picks = stations.map((s) => pickGasStop([s], route, along, win, rangeMi)).filter((p): p is GasPick => p != null);
   return picks.sort((a, b) => Number(b.inWindow) - Number(a.inWindow) || a.detourMi - b.detourMi || a.aheadMi - b.aheadMi).slice(0, 12);
 }
 

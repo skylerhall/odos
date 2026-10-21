@@ -4,18 +4,7 @@
 import { MI, pointAt, type Line, type LngLat } from './geo';
 import type { FuelKind } from './vehicles/types';
 
-export type Sky =
-  | 'clear'
-  | 'partly'
-  | 'cloudy'
-  | 'fog'
-  | 'drizzle'
-  | 'rain'
-  | 'heavyRain'
-  | 'freezing'
-  | 'snow'
-  | 'heavySnow'
-  | 'storm';
+export type Sky = 'clear' | 'partly' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'heavyRain' | 'freezing' | 'snow' | 'heavySnow' | 'storm';
 
 export type Condition = {
   sky: Sky;
@@ -151,7 +140,8 @@ export function routeSamples(line: Line, alongNow: number, cruiseMph: number, ev
     out.push({ coord: pointAt(line, alongNow + ahead).coord, aheadMeters: ahead, etaSeconds: ahead / mps });
   }
   const left = line.length - alongNow;
-  if (left > 5 * MI && out.length < max) out.push({ coord: line.coords[line.coords.length - 1], aheadMeters: left, etaSeconds: left / mps });
+  if (left > 5 * MI && out.length < max)
+    out.push({ coord: line.coords[line.coords.length - 1], aheadMeters: left, etaSeconds: left / mps });
   return out;
 }
 

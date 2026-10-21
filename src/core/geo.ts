@@ -14,8 +14,7 @@ export const milesToMeters = (mi: number) => mi * MI;
 export function haversine(a: LngLat, b: LngLat): number {
   const dLat = toRad(b[1] - a[1]);
   const dLon = toRad(b[0] - a[0]);
-  const s =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLon / 2) ** 2;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
@@ -62,12 +61,16 @@ export function snapToLine(line: Line, p: LngLat, fromIndex = 0, window = Infini
   for (let i = start; i < end; i++) {
     const a = coords[i];
     const b = coords[i + 1];
-    const ax = (a[0] - p[0]) * kx, ay = (a[1] - p[1]) * ky;
-    const bx = (b[0] - p[0]) * kx, by = (b[1] - p[1]) * ky;
-    const dx = bx - ax, dy = by - ay;
+    const ax = (a[0] - p[0]) * kx,
+      ay = (a[1] - p[1]) * ky;
+    const bx = (b[0] - p[0]) * kx,
+      by = (b[1] - p[1]) * ky;
+    const dx = bx - ax,
+      dy = by - ay;
     const len2 = dx * dx + dy * dy;
     const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2));
-    const qx = ax + t * dx, qy = ay + t * dy;
+    const qx = ax + t * dx,
+      qy = ay + t * dy;
     const offset = Math.hypot(qx, qy);
     if (offset < best.offset) {
       const point: LngLat = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
@@ -85,7 +88,8 @@ export function pointAt(line: Line, along: number): { coord: LngLat; bearing: nu
     const n = coords.length - 1;
     return { coord: coords[n], bearing: bearing(coords[Math.max(0, n - 1)], coords[n]), index: Math.max(0, n - 1) };
   }
-  let lo = 0, hi = cum.length - 1;
+  let lo = 0,
+    hi = cum.length - 1;
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
     if (cum[mid] <= along) lo = mid;
@@ -93,7 +97,8 @@ export function pointAt(line: Line, along: number): { coord: LngLat; bearing: nu
   }
   const seg = cum[hi] - cum[lo];
   const t = seg === 0 ? 0 : (along - cum[lo]) / seg;
-  const a = coords[lo], b = coords[hi];
+  const a = coords[lo],
+    b = coords[hi];
   return { coord: [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])], bearing: bearing(a, b), index: lo };
 }
 
@@ -106,7 +111,10 @@ export function sliceLine(line: Line, from: number, to: number): LngLat[] {
 }
 
 export function bboxOf(coords: LngLat[], padMeters = 0): BBox {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const [x, y] of coords) {
     if (x < minX) minX = x;
     if (y < minY) minY = y;

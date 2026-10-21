@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
-import { weatherIcon } from '../core/weather';
+import { StyleSheet, Text } from 'react-native';
 import type { WeatherState } from '../state/useWeather';
-import { useTheme } from './controls';
-import { TOUCH } from './theme';
+import { Icon, PressScale, useTheme } from './controls';
+import { elevate, font, NUMERIC, RADIUS, TOUCH } from './theme';
+import { weatherIconName } from './weatherIcons';
 
 /** The little weather badge beside the map: icon + temperature. Amber when there's a hazard. */
 export function WeatherChip({ wx, onPress }: { wx: WeatherState; onPress: () => void }) {
@@ -11,45 +11,37 @@ export function WeatherChip({ wx, onPress }: { wx: WeatherState; onPress: () => 
   if (!c) return null;
   const temp = !wx.previewing && wx.current?.tempF != null ? `${Math.round(wx.current.tempF)}°` : '';
   const warn = c.hazard || wx.alerts.length > 0;
+  const fg = warn ? t.onAmber : t.text;
   const label = `${c.label}${temp ? `, ${temp.replace('°', ' degrees')}` : ''}${wx.alerts.length ? `, ${wx.alerts.length} weather alert` : ''}${
     wx.previewing ? ', preview' : ''
   }. Tap for weather.`;
   return (
-    <Pressable
+    <PressScale
       onPress={onPress}
+      scaleTo={0.94}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: warn ? t.amber : t.bg, borderColor: warn ? t.amber : t.border, opacity: pressed ? 0.75 : 1 },
-      ]}
+      style={[styles.chip, { backgroundColor: warn ? t.amber : t.bg }, elevate(t, 2)]}
     >
-      <Text style={styles.icon}>{weatherIcon(c.sky, wx.isDay)}</Text>
-      {temp ? <Text style={[styles.temp, { color: warn ? t.onAmber : t.text }]}>{temp}</Text> : null}
-      {wx.alerts.length ? <Text style={[styles.temp, { color: t.onAmber }]}>⚠️</Text> : null}
+      <Icon name={weatherIconName(c.sky, wx.isDay)} size={24} color={warn ? t.onAmber : t.accent} />
+      {temp ? <Text style={[styles.temp, { color: fg }]}>{temp}</Text> : null}
+      {wx.alerts.length ? <Icon name="alert" size={20} color={t.onAmber} /> : null}
       {wx.previewing ? <Text style={[styles.tag, { color: warn ? t.onAmber : t.muted }]}>preview</Text> : null}
-    </Pressable>
+    </PressScale>
   );
 }
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: TOUCH,
+    minHeight: TOUCH - 4,
     minWidth: TOUCH + 8,
     alignSelf: 'flex-start',
-    borderRadius: TOUCH / 2,
-    borderWidth: 2,
-    paddingHorizontal: 12,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    marginTop: 10,
   },
-  icon: { fontSize: 26 },
-  temp: { fontSize: 20, fontWeight: '900', marginLeft: 6 },
-  tag: { fontSize: 12, fontWeight: '800', marginLeft: 6 },
+  temp: { fontSize: 18, fontFamily: font('600'), marginLeft: 6, marginRight: 2, ...NUMERIC },
+  tag: { fontSize: 12, fontFamily: font('500'), marginLeft: 6 },
 });

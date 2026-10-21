@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 import type { Place, Stop } from '../../core/places';
 import type { OfflineStatus } from '../../services/offline';
 import { BigButton, Chip, ResultRow, Sheet, useTheme } from '../controls';
+import { font } from '../theme';
 
 /** Trip overview: stops (remove any), offline status, Sim speed, end trip. */
 export function TripSheet(props: {
@@ -21,21 +22,40 @@ export function TripSheet(props: {
   return (
     <Sheet visible={props.visible} title="Trip" onClose={props.onClose}>
       {props.destination ? (
-        <Text style={{ color: t.text, fontSize: 20, fontWeight: '800', marginBottom: 6 }}>🏁 {props.destination.name}</Text>
+        <Text style={{ color: t.text, fontSize: 20, fontFamily: font('700'), marginBottom: 6 }}>{props.destination.name}</Text>
       ) : (
-        <Text style={{ color: t.muted, fontSize: 17 }}>No trip yet.</Text>
+        <Text style={{ color: t.muted, fontSize: 17, fontFamily: font('400') }}>No trip yet.</Text>
       )}
       {props.stops.map((s, i) => (
         <ResultRow
           key={s.id}
           title={`${i + 1}. ${s.name}`}
-          subtitle={`${s.auto ? 'Auto gas stop' : s.kind === 'gas' ? 'Gas' : s.note ?? 'Stop'}`}
+          icon={
+            s.kind === 'gas'
+              ? 'gas-station'
+              : s.kind === 'hotel'
+                ? 'bed'
+                : s.kind === 'camp'
+                  ? 'tent'
+                  : s.kind === 'freepark'
+                    ? 'parking'
+                    : 'map-marker-outline'
+          }
+          iconTone={s.auto ? 'amber' : 'accent'}
+          subtitle={`${s.auto ? 'Auto gas stop' : s.kind === 'gas' ? 'Gas' : (s.note ?? 'Stop')}`}
           action="Remove"
           tone="plain"
           onAction={() => props.onRemove(s.id)}
         />
       ))}
-      <Text style={{ color: off.state === 'error' ? t.danger : off.state === 'ready' ? t.good : t.muted, fontSize: 16, fontWeight: '700', marginVertical: 10 }}>
+      <Text
+        style={{
+          color: off.state === 'error' ? t.danger : off.state === 'ready' ? t.good : t.muted,
+          fontSize: 16,
+          fontFamily: font('600'),
+          marginVertical: 10,
+        }}
+      >
         {off.state === 'idle'
           ? 'Offline maps: saved when a trip starts'
           : off.state === 'saving'
@@ -46,7 +66,7 @@ export function TripSheet(props: {
       </Text>
       {props.sim ? (
         <View>
-          <Text style={{ color: t.muted, fontSize: 15, fontWeight: '700', marginBottom: 4 }}>SIM SPEED</Text>
+          <Text style={{ color: t.muted, fontSize: 15, fontFamily: font('600'), marginBottom: 4 }}>SIM SPEED</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {[1, 4, 16, 60].map((n) => (
               <Chip key={n} label={`${n}×`} on={props.simSpeed === n} onPress={() => props.onSimSpeed(n)} />
@@ -56,7 +76,7 @@ export function TripSheet(props: {
       ) : null}
       {props.destination ? (
         <BigButton
-          icon="⏹"
+          icon="stop-circle-outline"
           label="End trip"
           tone="danger"
           onPress={() => {

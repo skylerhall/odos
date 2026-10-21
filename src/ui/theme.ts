@@ -1,48 +1,92 @@
-// High-contrast palette and big touch targets: ODOS is used at a glance, often one-handed.
+// Design tokens. One accent (a calm blue), one cool-gray family, semantic amber/red/green used
+// only for meaning (fuel, danger, arrival). High contrast and big targets: ODOS is read at a
+// glance, often one-handed, sometimes in gloves.
+
+import type { TextStyle, ViewStyle } from 'react-native';
 
 export type Theme = typeof DAY;
 
 export const DAY = {
+  /** Sheets and floating cards. */
   bg: '#FFFFFF',
-  panel: '#F4F6F8',
-  text: '#0B1220',
-  muted: '#4A5568',
-  border: '#D0D7DE',
-  accent: '#0A6CFF',
+  /** Recessed fills: soft buttons, inputs, tracks. */
+  panel: '#F0F3F7',
+  text: '#0F1722',
+  muted: '#5B6676',
+  border: '#E1E6ED',
+  accent: '#2F6BDB',
+  accentSoft: '#E6EEFC',
   onAccent: '#FFFFFF',
-  amber: '#F5A300',
-  onAmber: '#1A1200',
-  danger: '#D92D20',
-  good: '#12A150',
-  banner: '#0B3D2E',
+  amber: '#E39B12',
+  amberSoft: '#FCF0D7',
+  onAmber: '#241800',
+  danger: '#CF423A',
+  dangerSoft: '#FBE7E5',
+  good: '#1E9A62',
+  /** Turn-by-turn banner: dark ink so it reads over any map. */
+  banner: '#13202F',
   onBanner: '#FFFFFF',
-  overlay: 'rgba(0,0,0,0.35)',
+  overlay: 'rgba(10, 18, 30, 0.38)',
+  /** Shadows are tinted toward the ink color, never pure black. */
+  shadow: '#0B1A33',
 };
 
 export const NIGHT: Theme = {
-  bg: '#0E1116',
-  panel: '#171B22',
-  text: '#F2F4F7',
-  muted: '#A0AEC0',
-  border: '#2D3440',
-  accent: '#4C9AFF',
-  onAccent: '#0B1220',
-  amber: '#FFB627',
-  onAmber: '#1A1200',
-  danger: '#FF6B5E',
-  good: '#3DDC84',
-  banner: '#0F5C43',
+  bg: '#141B25',
+  panel: '#1D2633',
+  text: '#EEF2F7',
+  muted: '#9AA6B6',
+  border: '#2A3546',
+  accent: '#77A2F4',
+  accentSoft: '#1F2C45',
+  onAccent: '#0B1422',
+  amber: '#F2B33D',
+  amberSoft: '#3A2E14',
+  onAmber: '#1E1500',
+  danger: '#F07068',
+  dangerSoft: '#3B1D1C',
+  good: '#45C78C',
+  banner: '#0C121B',
   onBanner: '#FFFFFF',
-  overlay: 'rgba(0,0,0,0.55)',
+  overlay: 'rgba(0, 0, 0, 0.55)',
+  shadow: '#000000',
 };
 
 /** Minimum touch size. WCAG asks for 44pt; drivers in gloves need more. */
 export const TOUCH = 56;
 
+/** Containers are softer than the controls inside them. */
+export const RADIUS = { sheet: 28, card: 22, control: 16, chip: 14, pill: 999 };
+
+/** Geist, loaded in App.tsx. Each weight is its own font family on Android. */
+const FAMILY = {
+  '400': 'Geist_400Regular',
+  '500': 'Geist_500Medium',
+  '600': 'Geist_600SemiBold',
+  '700': 'Geist_700Bold',
+  '800': 'Geist_800ExtraBold',
+} as const;
+
+export type Weight = '400' | '500' | '600' | '700' | '800' | '900';
+
+/** Font family for a weight (900 maps to 800, the heaviest we load). */
+export function font(weight: Weight = '400'): TextStyle['fontFamily'] {
+  return FAMILY[weight === '900' ? '800' : weight];
+}
+
+/** Numbers that update live (ETA, miles, range) use tabular figures so they don't jitter. */
+export const NUMERIC: TextStyle = { fontVariant: ['tabular-nums'] };
+
+/** Soft, tinted elevation. Level 1 = resting card, 2 = floating control, 3 = sheet. */
+export function elevate(t: Theme, level: 1 | 2 | 3): ViewStyle {
+  const k = { 1: [2, 6, 0.1, 2], 2: [6, 14, 0.16, 4], 3: [12, 24, 0.22, 8] }[level];
+  return { elevation: k[0], shadowColor: t.shadow, shadowRadius: k[1], shadowOpacity: k[2], shadowOffset: { width: 0, height: k[3] } };
+}
+
 export const CONGESTION_COLORS = {
-  low: '#2E7DFF',
-  moderate: '#F5A300',
-  heavy: '#E8590C',
-  severe: '#B42318',
-  unknown: '#2E7DFF',
+  low: '#2F6BDB',
+  moderate: '#E39B12',
+  heavy: '#E06A1B',
+  severe: '#B83A2E',
+  unknown: '#2F6BDB',
 } as const;

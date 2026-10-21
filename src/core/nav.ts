@@ -52,8 +52,7 @@ export class NavTracker {
     const stepEnd = step.start + step.distance;
 
     const stepFrac = step.distance > 0 ? (stepEnd - along) / step.distance : 0;
-    const remainingSeconds =
-      step.duration * Math.max(0, stepFrac) + r.steps.slice(stepIndex + 1).reduce((t, s) => t + s.duration, 0);
+    const remainingSeconds = step.duration * Math.max(0, stepFrac) + r.steps.slice(stepIndex + 1).reduce((t, s) => t + s.duration, 0);
 
     const lane = r.lanes.find((l) => l.at >= along - 20 && l.at - along <= 2000);
 
@@ -69,7 +68,10 @@ export class NavTracker {
     }
     this.lastAlong = along;
 
-    const legIndex = Math.max(0, r.legEnds.findIndex((end) => along < end - NAV.arriveMeters));
+    const legIndex = Math.max(
+      0,
+      r.legEnds.findIndex((end) => along < end - NAV.arriveMeters),
+    );
 
     return {
       progress: {

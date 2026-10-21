@@ -66,7 +66,13 @@ async function freeParking(at: LngLat, radiusM: number): Promise<Place[]> {
 /** Federal campgrounds (NPS, USFS, BLM, Army Corps) from Recreation.gov. Needs a free RIDB key. */
 async function federalCampgrounds(at: LngLat, radiusMi: number): Promise<Place[]> {
   if (!RIDB_KEY) return [];
-  type Facility = { FacilityID: string; FacilityName: string; FacilityLatitude: number; FacilityLongitude: number; FacilityTypeDescription?: string };
+  type Facility = {
+    FacilityID: string;
+    FacilityName: string;
+    FacilityLatitude: number;
+    FacilityLongitude: number;
+    FacilityTypeDescription?: string;
+  };
   const data = await fetchJson<{ RECDATA: Facility[] }>(
     `https://ridb.recreation.gov/api/v1/facilities?${qs({ latitude: at[1], longitude: at[0], radius: Math.round(radiusMi), activity: 9, limit: 50 })}`,
     { headers: { apikey: RIDB_KEY, accept: 'application/json' } },
@@ -106,7 +112,10 @@ export async function findRest(point: LngLat, kinds: RestKind[], cached: Place[]
   let timed: RestOption[];
   try {
     if (!online || !hasToken()) throw new Error('offline');
-    const times = await driveTimes(point, places.map((p) => p.coord));
+    const times = await driveTimes(
+      point,
+      places.map((p) => p.coord),
+    );
     timed = places.map((p, i) => {
       const t = times[i];
       if (t?.seconds == null) {

@@ -3,6 +3,7 @@ import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import type { Place } from '../../core/places';
 import { ResultRow, Sheet, useTheme } from '../controls';
 import { useAsync } from '../useAsync';
+import { font } from '../theme';
 
 /** "Where to?" — type an address or place; results update as you type. */
 export function DestinationSheet(props: {
@@ -37,17 +38,33 @@ export function DestinationSheet(props: {
         autoFocus
         returnKeyType="search"
         accessibilityLabel="Search for a destination"
-        style={{ minHeight: 60, borderWidth: 2, borderColor: t.border, borderRadius: 14, paddingHorizontal: 14, fontSize: 20, color: t.text, backgroundColor: t.panel }}
+        style={{
+          minHeight: 58,
+          borderRadius: 16,
+          paddingHorizontal: 16,
+          fontSize: 19,
+          color: t.text,
+          backgroundColor: t.panel,
+          fontFamily: font('400'),
+        }}
       />
       <View style={{ minHeight: 28, justifyContent: 'center' }}>
         {loading ? <ActivityIndicator color={t.accent} /> : null}
-        {error ? <Text style={{ color: t.danger, fontSize: 16 }}>No signal. Search needs a connection.</Text> : null}
+        {error ? (
+          <Text style={{ color: t.danger, fontSize: 16, fontFamily: font('400') }}>No signal. Search needs a connection.</Text>
+        ) : null}
       </View>
       {results.map((p) => (
         <View key={p.id}>
-          <ResultRow title={p.name} subtitle={p.address} action="Go" onAction={() => props.onGo(p)} />
+          <ResultRow title={p.name} subtitle={p.address} icon="map-marker-outline" action="Go" onAction={() => props.onGo(p)} />
           {props.hasTrip ? (
-            <ResultRow title="" subtitle={`Add ${p.name} as a stop on this trip`} action="+ Stop" tone="plain" onAction={() => props.onAddStop(p)} />
+            <ResultRow
+              title=""
+              subtitle={`Add ${p.name} as a stop on this trip`}
+              action="+ Stop"
+              tone="plain"
+              onAction={() => props.onAddStop(p)}
+            />
           ) : null}
         </View>
       ))}

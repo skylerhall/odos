@@ -1,3 +1,4 @@
+import type { IconName } from './controls';
 import { MI } from '../core/geo';
 
 /** Distance for spoken-style display: feet when close, tenths under 10 miles, whole miles beyond. */
@@ -22,38 +23,38 @@ export function clockIn(seconds: number): string {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-/** Arrow for a maneuver (type + modifier from Mapbox). */
-export function maneuverGlyph(type: string, modifier?: string): string {
-  if (type === 'arrive') return '🏁';
-  if (type === 'depart') return '⬆';
-  if (type === 'roundabout' || type === 'rotary') return '⟳';
+/** Icon for a maneuver (type + modifier from Mapbox). */
+export function maneuverGlyph(type: string, modifier?: string): IconName {
+  if (type === 'arrive') return 'flag-checkered';
+  if (type === 'roundabout' || type === 'rotary') return 'rotate-right';
+  if (type === 'depart') return 'arrow-up';
   switch (modifier) {
     case 'uturn':
-      return '↶';
+      return 'arrow-u-left-top';
     case 'sharp left':
     case 'left':
-      return '⬅';
+      return 'arrow-left';
     case 'slight left':
-      return '⬉';
+      return 'arrow-top-left';
     case 'sharp right':
     case 'right':
-      return '➡';
+      return 'arrow-right';
     case 'slight right':
-      return '⬈';
+      return 'arrow-top-right';
     default:
-      return '⬆';
+      return 'arrow-up';
   }
 }
 
-/** Arrow for a lane's indications (e.g. ["straight","right"]). */
-export function laneGlyph(indications: string[]): string {
+/** Icon for a lane's indications (e.g. ["straight","right"]). */
+export function laneGlyph(indications: string[]): IconName {
   const has = (s: string) => indications.includes(s);
-  if (has('uturn')) return '↶';
-  if (has('straight') && (has('left') || has('slight left'))) return '↰';
-  if (has('straight') && (has('right') || has('slight right'))) return '↱';
-  if (has('left') || has('sharp left')) return '←';
-  if (has('slight left')) return '↖';
-  if (has('right') || has('sharp right')) return '→';
-  if (has('slight right')) return '↗';
-  return '↑';
+  if (has('uturn')) return 'arrow-u-left-top';
+  if (has('straight') && (has('left') || has('slight left'))) return 'arrow-left-top';
+  if (has('straight') && (has('right') || has('slight right'))) return 'arrow-right-top';
+  if (has('left') || has('sharp left')) return 'arrow-left';
+  if (has('slight left')) return 'arrow-top-left';
+  if (has('right') || has('sharp right')) return 'arrow-right';
+  if (has('slight right')) return 'arrow-top-right';
+  return 'arrow-up';
 }

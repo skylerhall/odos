@@ -122,12 +122,14 @@ function Cloud({ index, screenW, top, dark }: { index: number; screenW: number; 
   const w = 180 + (index % 3) * 50;
   useEffect(() => {
     const drift = () =>
-      Animated.timing(x, { toValue: 1, duration: 70000 + index * 18000, easing: Easing.linear, useNativeDriver: true }).start(({ finished }) => {
-        if (finished) {
-          x.setValue(0);
-          drift();
-        }
-      });
+      Animated.timing(x, { toValue: 1, duration: 70000 + index * 18000, easing: Easing.linear, useNativeDriver: true }).start(
+        ({ finished }) => {
+          if (finished) {
+            x.setValue(0);
+            drift();
+          }
+        },
+      );
     drift();
     return () => x.stopAnimation();
   }, [x, index]);
@@ -144,7 +146,15 @@ function Cloud({ index, screenW, top, dark }: { index: number; screenW: number; 
       {puffs.map((p, i) => (
         <View
           key={i}
-          style={{ position: 'absolute', left: p.l, top: p.t, width: p.d, height: p.h ?? p.d, borderRadius: p.d / 2, backgroundColor: color }}
+          style={{
+            position: 'absolute',
+            left: p.l,
+            top: p.t,
+            width: p.d,
+            height: p.h ?? p.d,
+            borderRadius: p.d / 2,
+            backgroundColor: color,
+          }}
         />
       ))}
     </Animated.View>

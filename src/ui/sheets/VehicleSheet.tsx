@@ -16,6 +16,7 @@ import {
 } from '../../services/vehicleLookup';
 import { BigButton, Chip, ResultRow, Sheet, useTheme } from '../controls';
 import { useAsync } from '../useAsync';
+import { font } from '../theme';
 
 type Mode = 'search' | 'exact' | 'vin' | 'custom';
 
@@ -66,14 +67,13 @@ function Input(props: {
       autoCorrect={false}
       style={{
         minHeight: 58,
-        borderWidth: 2,
-        borderColor: t.border,
-        borderRadius: 14,
-        paddingHorizontal: 14,
+        borderRadius: 16,
+        paddingHorizontal: 16,
         fontSize: 19,
+        fontFamily: font('400'),
         color: t.text,
         backgroundColor: t.panel,
-        marginBottom: 8,
+        marginBottom: 10,
       }}
     />
   );
@@ -126,7 +126,7 @@ function SearchMode({ onPick }: { onPick: (v: Vehicle) => void }) {
     <View>
       <Input value={q} onChangeText={onChange} placeholder='Try "2007 tundra 4.7" or "dodge"' label="Search vehicles" />
       {q.trim() ? (
-        <Text style={{ color: t.muted, fontSize: 15, marginBottom: 4 }}>
+        <Text style={{ color: t.muted, fontSize: 15, marginBottom: 4, fontFamily: font('400') }}>
           {results.length === 0
             ? yearTyped
               ? 'Not in the built-in list. Checking the EPA list below…'
@@ -149,12 +149,18 @@ function SearchMode({ onPick }: { onPick: (v: Vehicle) => void }) {
 
       {wantEpa || (yearTyped && q.trim() !== settled) ? (
         <View style={{ marginTop: 14 }}>
-          <Text style={{ color: t.muted, fontSize: 15, fontWeight: '800' }}>EXACT MATCHES · EPA (fueleconomy.gov)</Text>
+          <Text style={{ color: t.muted, fontSize: 15, fontFamily: font('700') }}>EXACT MATCHES · EPA (fueleconomy.gov)</Text>
           {epa.loading || q.trim() !== settled || picking ? <ActivityIndicator color={t.accent} style={{ margin: 12 }} /> : null}
-          {epa.error ? <Text style={{ color: t.danger, fontSize: 16 }}>Couldn’t reach the EPA list. It needs a connection.</Text> : null}
-          {pickError ? <Text style={{ color: t.danger, fontSize: 16 }}>Couldn’t load that vehicle. Try again.</Text> : null}
+          {epa.error ? (
+            <Text style={{ color: t.danger, fontSize: 16, fontFamily: font('400') }}>
+              Couldn’t reach the EPA list. It needs a connection.
+            </Text>
+          ) : null}
+          {pickError ? (
+            <Text style={{ color: t.danger, fontSize: 16, fontFamily: font('400') }}>Couldn’t load that vehicle. Try again.</Text>
+          ) : null}
           {!epa.loading && epa.data && epa.data.length === 0 && q.trim() === settled ? (
-            <Text style={{ color: t.text, fontSize: 16 }}>
+            <Text style={{ color: t.text, fontSize: 16, fontFamily: font('400') }}>
               No EPA match for “{settled}”. Check the spelling, or try just the year and model.
             </Text>
           ) : null}
@@ -210,9 +216,9 @@ function ExactMode({ onPick }: { onPick: (v: Vehicle) => void }) {
   const crumbs = [path.year?.text, path.make?.text, path.model?.text].filter(Boolean).join(' › ');
   return (
     <View>
-      <Text style={{ color: t.text, fontSize: 18, fontWeight: '800', marginBottom: 6 }}>
+      <Text style={{ color: t.text, fontSize: 18, fontFamily: font('700'), marginBottom: 6 }}>
         {`Choose ${step === 'option' ? 'engine' : step}`}
-        {crumbs ? <Text style={{ color: t.muted, fontWeight: '600' }}>{`   ${crumbs}`}</Text> : null}
+        {crumbs ? <Text style={{ color: t.muted, fontFamily: font('500') }}>{`   ${crumbs}`}</Text> : null}
       </Text>
       {crumbs ? (
         <BigButton
@@ -222,7 +228,7 @@ function ExactMode({ onPick }: { onPick: (v: Vehicle) => void }) {
         />
       ) : null}
       {busy ? <ActivityIndicator color={t.accent} style={{ margin: 12 }} /> : null}
-      {error ? <Text style={{ color: t.danger, fontSize: 16 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: t.danger, fontSize: 16, fontFamily: font('400') }}>{error}</Text> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {items.map((i) => (
           <Chip key={i.value} label={i.text} onPress={() => choose(i)} />
@@ -260,7 +266,7 @@ function VinMode({ onPick }: { onPick: (v: Vehicle) => void }) {
       <Input value={vin} onChangeText={(s) => setVin(s.toUpperCase())} placeholder="17-character VIN" label="VIN" autoCaps />
       <BigButton label="Decode VIN" tone="accent" onPress={run} disabled={vin.trim().length !== 17 || busy} />
       {busy ? <ActivityIndicator color={t.accent} style={{ margin: 12 }} /> : null}
-      {status ? <Text style={{ color: t.text, fontSize: 17, fontWeight: '700', marginTop: 10 }}>{status}</Text> : null}
+      {status ? <Text style={{ color: t.text, fontSize: 17, fontFamily: font('600'), marginTop: 10 }}>{status}</Text> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
         {options.map((o) => (
           <Chip key={o.value} label={o.text} onPress={async () => onPick(await epaVehicle(o.value))} />

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from './controls';
+import { font } from './theme';
 
 /**
  * The grab bar on top of the bottom panel. Tap it or swipe down to minimize the panel, tap or
@@ -41,5 +42,5 @@ const styles = StyleSheet.create({
   // Wide and tall enough to hit without looking (WCAG target size, gloves).
   btn: { minHeight: 44, minWidth: 180, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   bar: { width: 48, height: 5, borderRadius: 3, marginBottom: 4 },
-  label: { fontSize: 13, fontWeight: '800' },
+  label: { fontSize: 13, fontFamily: font('700') },
 });

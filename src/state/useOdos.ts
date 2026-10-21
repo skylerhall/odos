@@ -135,7 +135,9 @@ export function useOdos() {
       } catch (e) {
         if (seq === routeSeq.current) {
           notify(
-            live.current.route ? 'No signal to reroute. Following the saved route.' : `Couldn’t get a route: ${e instanceof Error ? e.message : e}`,
+            live.current.route
+              ? 'No signal to reroute. Following the saved route.'
+              : `Couldn’t get a route: ${e instanceof Error ? e.message : e}`,
             'danger',
           );
         }
@@ -253,7 +255,12 @@ export function useOdos() {
     if (!here) return null;
     try {
       const near = await nearbyGas(here.coord);
-      const options: GasPick[] = near.map((place) => ({ place, aheadMi: haversine(here.coord, place.coord) / MI, detourMi: 0, inWindow: true }));
+      const options: GasPick[] = near.map((place) => ({
+        place,
+        aheadMi: haversine(here.coord, place.coord) / MI,
+        detourMi: 0,
+        inWindow: true,
+      }));
       const plan = { pick: options[0] ?? null, options, offline: false };
       setGas(plan);
       return plan;

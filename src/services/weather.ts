@@ -71,5 +71,10 @@ export async function nwsAlerts([lon, lat]: LngLat): Promise<WeatherAlert[]> {
   });
   return (data.features ?? [])
     .filter((f) => ['Extreme', 'Severe', 'Moderate'].includes(f.properties.severity))
-    .map((f) => ({ id: f.id, event: f.properties.event, headline: f.properties.headline ?? f.properties.event, severity: f.properties.severity }));
+    .map((f) => ({
+      id: f.id,
+      event: f.properties.event,
+      headline: f.properties.headline ?? f.properties.event,
+      severity: f.properties.severity,
+    }));
 }

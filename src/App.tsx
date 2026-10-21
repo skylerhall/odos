@@ -1,3 +1,11 @@
+// Per-weight imports so only these five font files get bundled, not all eighteen.
+import { Geist_400Regular } from '@expo-google-fonts/geist/400Regular';
+import { Geist_500Medium } from '@expo-google-fonts/geist/500Medium';
+import { Geist_600SemiBold } from '@expo-google-fonts/geist/600SemiBold';
+import { Geist_700Bold } from '@expo-google-fonts/geist/700Bold';
+import { Geist_800ExtraBold } from '@expo-google-fonts/geist/800ExtraBold';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -9,7 +17,7 @@ import { hasToken } from './services/mapbox';
 import { load, save } from './services/storage';
 import { useOdos } from './state/useOdos';
 import { useWeather } from './state/useWeather';
-import { BigButton, RoundToggle, ThemeContext, useTheme } from './ui/controls';
+import { ActionTile, BigButton, Icon, IconButton, PressScale, Rail, RoundToggle, ThemeContext, useTheme } from './ui/controls';
 import { clockIn, duration, miles } from './ui/format';
 import { FuelPanel } from './ui/FuelPanel';
 import { ManeuverBanner } from './ui/ManeuverBanner';
@@ -23,7 +31,7 @@ import { VehicleSheet } from './ui/sheets/VehicleSheet';
 import { WeatherSheet } from './ui/sheets/WeatherSheet';
 import { WeatherChip } from './ui/WeatherChip';
 import { WeatherOverlay } from './ui/WeatherOverlay';
-import { DAY, NIGHT } from './ui/theme';
+import { DAY, elevate, font, NIGHT, NUMERIC, RADIUS } from './ui/theme';
 
 type SheetName = 'dest' | 'vehicle' | 'rest' | 'gas' | 'trip' | 'weather' | null;
 
@@ -37,6 +45,15 @@ export default function App() {
 
 function Main() {
   useKeepAwake();
+  // Geist + the icon font, bundled with the app. If loading fails we fall back to the system font.
+  const [fontsLoaded, fontError] = useFonts({
+    Geist_400Regular,
+    Geist_500Medium,
+    Geist_600SemiBold,
+    Geist_700Bold,
+    Geist_800ExtraBold,
+    ...MaterialCommunityIcons.font,
+  });
   const odos = useOdos();
   const { settings, actions: a } = odos;
   const theme = settings.night ? NIGHT : DAY;
@@ -91,7 +108,7 @@ function Main() {
   const remainingS = p?.remainingSeconds ?? trip?.duration ?? 0;
   const remainingMi = (p?.remainingMeters ?? trip?.distance ?? 0) / MI;
 
-  if (!odos.loaded) {
+  if (!odos.loaded || (!fontsLoaded && !fontError)) {
     return (
       <View style={[styles.center, { backgroundColor: theme.bg }]}>
         <ActivityIndicator size="large" color={theme.accent} />
@@ -125,7 +142,7 @@ function Main() {
           />
         ) : (
           <View style={[styles.center, { backgroundColor: theme.panel, padding: 24 }]}>
-            <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800', textAlign: 'center' }}>
+            <Text style={{ color: theme.text, fontSize: 20, fontFamily: font('700'), textAlign: 'center' }}>
               Add your Mapbox public token (pk.…) to the .env file as EXPO_PUBLIC_MAPBOX_TOKEN, then rebuild. See README.
             </Text>
           </View>
@@ -138,22 +155,21 @@ function Main() {
           {trip ? (
             <ManeuverBanner progress={p} lanes={odos.lanes} rerouting={odos.routing} />
           ) : (
-            <Pressable
+            <PressScale
               accessibilityRole="search"
               accessibilityLabel="Where to? Search for a destination"
               onPress={() => setSheet('dest')}
-              style={[styles.searchPill, { backgroundColor: theme.bg, borderColor: theme.border }]}
+              scaleTo={0.98}
+              style={[styles.searchPill, { backgroundColor: theme.bg }, elevate(theme, 2)]}
             >
-              <Text style={{ fontSize: 22 }}>🔍</Text>
-              <Text style={{ color: theme.muted, fontSize: 20, fontWeight: '700', marginLeft: 10 }}>
-                {odos.routing ? 'Finding route…' : 'Where to?'}
-              </Text>
-            </Pressable>
+              <Icon name="magnify" size={26} color={theme.accent} />
+              <Text style={[styles.searchText, { color: theme.muted }]}>{odos.routing ? 'Finding route…' : 'Where to?'}</Text>
+            </PressScale>
           )}
           <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
           {odos.permission === 'denied' && !settings.sim ? (
             <BigButton
-              icon="📍"
+              icon="map-marker-off"
               label="Location is off. Tap to allow it"
               tone="danger"
               onPress={a.requestLocation}
@@ -161,16 +177,19 @@ function Main() {
             />
           ) : null}
           {odos.pin ? (
-            <View style={[styles.pinBar, { backgroundColor: theme.bg, borderColor: theme.border }]}>
-              <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', flex: 1 }}>📌 {formatCoords(odos.pin, 5)}</Text>
+            <View style={[styles.pinBar, { backgroundColor: theme.bg }, elevate(theme, 2)]}>
+              <Icon name="map-marker" size={22} color={theme.accent} />
+              <Text style={[styles.pinText, { color: theme.text }]} numberOfLines={1}>
+                {formatCoords(odos.pin, 5)}
+              </Text>
               <BigButton
                 label="Go"
                 tone="accent"
                 onPress={() => a.navigateTo({ id: `pin:${odos.pin}`, name: 'Dropped pin', coord: odos.pin!, kind: 'custom' })}
                 style={styles.pinBtn}
               />
-              <BigButton label="Rest ≤2h" onPress={() => setSheet('rest')} style={styles.pinBtn} />
-              <BigButton label="✕" onPress={() => a.setPin(null)} style={styles.pinBtn} />
+              <BigButton icon="bed" label="Rest" onPress={() => setSheet('rest')} style={styles.pinBtn} />
+              <IconButton icon="close" label="Remove the pin" onPress={() => a.setPin(null)} />
             </View>
           ) : null}
         </View>
@@ -178,19 +197,24 @@ function Main() {
         {/* ── side rail of one-tap toggles ── */}
         <View style={[styles.rail, { top: insets.top + (trip ? 210 : 90) }]} pointerEvents="box-none">
           {minimized ? null : (
-            <>
-              <RoundToggle icon="🔊" label="Voice" on={settings.voice} onPress={() => a.toggle('voice')} />
-              <RoundToggle icon="🌙" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
-              <RoundToggle icon="🚦" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
-              <RoundToggle icon="🧪" label="Sim" on={settings.sim} onPress={() => a.toggle('sim')} />
-            </>
+            <Rail>
+              <RoundToggle
+                icon={settings.voice ? 'volume-high' : 'volume-off'}
+                label="Voice"
+                on={settings.voice}
+                onPress={() => a.toggle('voice')}
+              />
+              <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
+              <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
+              <RoundToggle icon="flask-outline" label="Sim" on={settings.sim} onPress={() => a.toggle('sim')} />
+            </Rail>
           )}
         </View>
 
         {/* ── bottom panel ── */}
         <View
           onLayout={(e) => setPanelH(Math.round(e.nativeEvent.layout.height))}
-          style={[styles.bottom, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 10, borderColor: theme.border }]}
+          style={[styles.bottom, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 10 }, elevate(theme, 3)]}
         >
           {odos.toast ? <ToastBar key={odos.toast.id} text={odos.toast.text} tone={odos.toast.tone} onDone={a.dismissToast} /> : null}
           <PanelHandle minimized={minimized} onChange={setMinimized} />
@@ -209,10 +233,13 @@ function Main() {
                 {trip ? (
                   <Text style={[styles.miniEta, { color: theme.good }]} numberOfLines={1}>
                     {clockIn(remainingS)}
-                    <Text style={[styles.miniMeta, { color: theme.text }]}> {miles(remainingMi)}</Text>
+                    <Text style={[styles.miniMeta, { color: theme.muted }]}> · {miles(remainingMi)}</Text>
                   </Text>
                 ) : (
-                  <Text style={[styles.miniMeta, { color: theme.muted }]}>🔍 Where to?</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Icon name="magnify" size={22} color={theme.accent} />
+                    <Text style={[styles.miniMeta, { color: theme.muted, marginLeft: 8 }]}>Where to?</Text>
+                  </View>
                 )}
               </Pressable>
               {odos.fuelOutlook ? (
@@ -220,16 +247,15 @@ function Main() {
                   onPress={() => setMinimized(false)}
                   accessibilityRole="button"
                   accessibilityLabel={`Fuel range ${miles(odos.fuelOutlook.rangeMi)}${odos.fuelOutlook.inBuffer ? ', fuel stop needed' : ''}. Tap to show the menu.`}
-                  style={[
-                    styles.miniFuel,
-                    {
-                      backgroundColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.panel,
-                      borderColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.border,
-                    },
-                  ]}
+                  style={[styles.miniFuel, { backgroundColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.panel }]}
                 >
-                  <Text style={[styles.miniMeta, { color: odos.fuelOutlook.inBuffer ? theme.onAmber : theme.text }]}>
-                    {odos.vehicle?.fuel === 'ev' ? '🔋' : '⛽'} {miles(odos.fuelOutlook.rangeMi)}
+                  <Icon
+                    name={odos.vehicle?.fuel === 'ev' ? 'battery-charging' : 'gas-station'}
+                    size={20}
+                    color={odos.fuelOutlook.inBuffer ? theme.onAmber : theme.muted}
+                  />
+                  <Text style={[styles.miniMeta, { color: odos.fuelOutlook.inBuffer ? theme.onAmber : theme.text, marginLeft: 6 }]}>
+                    {miles(odos.fuelOutlook.rangeMi)}
                   </Text>
                 </Pressable>
               ) : null}
@@ -247,24 +273,27 @@ function Main() {
                 {duration(remainingS)} · {miles(remainingMi)}
                 {odos.stops.length ? ` · ${odos.stops.length} stop${odos.stops.length > 1 ? 's' : ''}` : ''}
               </Text>
-              <Text style={{ color: theme.muted, fontSize: 22 }}>⌃</Text>
+              <Icon name="chevron-right" size={26} color={theme.muted} />
             </Pressable>
           ) : null}
           {minimized ? null : (
             <>
               <FuelPanel vehicle={odos.vehicle} outlook={odos.fuelOutlook} onFillUp={a.fillUp} onPickVehicle={() => setSheet('vehicle')} />
-              <View style={styles.actions}>
-                <BigButton icon="🔍" label={trip ? 'Add stop' : 'Where to'} onPress={() => setSheet('dest')} style={styles.action} />
-                <BigButton
-                  icon="⛽"
-                  label="Gas"
-                  tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'plain'}
-                  onPress={() => setSheet('gas')}
-                  style={styles.action}
+              <View style={[styles.actions, { borderTopColor: theme.border }]}>
+                <ActionTile
+                  icon={trip ? 'map-marker-plus' : 'magnify'}
+                  label={trip ? 'Add stop' : 'Where to'}
+                  onPress={() => setSheet('dest')}
                 />
-                <BigButton icon="🛏" label="Rest ≤2h" onPress={() => setSheet('rest')} style={styles.action} />
-                <BigButton icon="📤" label="Share" onPress={a.shareLocation} style={styles.action} />
-                <BigButton icon="📋" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} style={styles.action} />
+                <ActionTile
+                  icon="gas-station"
+                  label="Gas"
+                  tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'accent'}
+                  onPress={() => setSheet('gas')}
+                />
+                <ActionTile icon="bed" label="Rest ≤2h" onPress={() => setSheet('rest')} />
+                <ActionTile icon="share-variant" label="Share" onPress={a.shareLocation} />
+                <ActionTile icon="content-copy" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} />
               </View>
             </>
           )}
@@ -347,47 +376,41 @@ function RecenterButton({
   const t = useTheme();
   const pill = driving && !following;
   return (
-    <Pressable
+    <PressScale
       onPress={onPress}
+      scaleTo={0.9}
       accessibilityRole="button"
       accessibilityLabel={following ? 'Map is centered on your location' : 'Re-center map on your location'}
-      style={({ pressed }) => [
-        pill ? styles.recenterPill : styles.recenter,
-        {
-          bottom,
-          backgroundColor: following ? t.bg : t.accent,
-          borderColor: following ? t.border : t.accent,
-          opacity: pressed ? 0.75 : 1,
-        },
-      ]}
+      style={[pill ? styles.recenterPill : styles.recenter, { bottom, backgroundColor: following ? t.bg : t.accent }, elevate(t, 2)]}
     >
-      <Text style={{ fontSize: pill ? 18 : 26, color: following ? t.accent : t.onAccent, fontWeight: '900' }}>
-        {pill ? '➤  Re-center' : '◎'}
-      </Text>
-    </Pressable>
+      <Icon name={pill ? 'navigation-variant' : 'crosshairs-gps'} size={pill ? 22 : 26} color={following ? t.accent : t.onAccent} />
+      {pill ? <Text style={[styles.recenterLabel, { color: t.onAccent }]}>Re-center</Text> : null}
+    </PressScale>
   );
 }
 
+/** Short confirmations and alerts above the panel. Tap to dismiss. */
 function ToastBar({ text, tone, onDone }: { text: string; tone: 'info' | 'amber' | 'good' | 'danger'; onDone: () => void }) {
-  const t = tone;
+  const t = useTheme();
   useEffect(() => {
     const id = setTimeout(onDone, tone === 'amber' ? 9000 : 5000);
     return () => clearTimeout(id);
   }, [onDone, tone]);
-  const colors = {
-    info: ['#1F2937', '#FFFFFF'],
-    amber: ['#F5A300', '#1A1200'],
-    good: ['#12A150', '#FFFFFF'],
-    danger: ['#D92D20', '#FFFFFF'],
-  }[t];
+  const look = {
+    info: { bg: t.banner, fg: t.onBanner, icon: 'information-outline' as const },
+    amber: { bg: t.amber, fg: t.onAmber, icon: 'alert-outline' as const },
+    good: { bg: t.good, fg: '#FFFFFF', icon: 'check-circle-outline' as const },
+    danger: { bg: t.danger, fg: '#FFFFFF', icon: 'alert-circle-outline' as const },
+  }[tone];
   return (
     <Pressable
       onPress={onDone}
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
-      style={{ backgroundColor: colors[0], borderRadius: 14, padding: 12, marginBottom: 10 }}
+      style={[styles.toast, { backgroundColor: look.bg }]}
     >
-      <Text style={{ color: colors[1], fontSize: 17, fontWeight: '800' }}>{text}</Text>
+      <Icon name={look.icon} size={22} color={look.fg} />
+      <Text style={[styles.toastText, { color: look.fg }]}>{text}</Text>
     </Pressable>
   );
 }
@@ -395,76 +418,66 @@ function ToastBar({ text, tone, onDone }: { text: string; tone: 'info' | 'amber'
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   top: { position: 'absolute', left: 12, right: 12 },
-  searchPill: {
-    minHeight: 64,
-    borderRadius: 32,
-    borderWidth: 2,
+  searchPill: { minHeight: 60, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
+  searchText: { fontSize: 19, fontFamily: font('500'), marginLeft: 12, letterSpacing: -0.2 },
+  pinBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    elevation: 4,
+    borderRadius: RADIUS.card,
+    paddingVertical: 8,
+    paddingLeft: 14,
+    paddingRight: 8,
+    marginTop: 10,
   },
-  pinBar: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 16, padding: 8, marginTop: 8 },
-  pinBtn: { minWidth: 64, minHeight: 56, marginLeft: 6 },
+  pinText: { flex: 1, fontSize: 15, fontFamily: font('500'), marginLeft: 8, ...NUMERIC },
+  pinBtn: { minWidth: 64, marginLeft: 6, paddingHorizontal: 12 },
   rail: { position: 'absolute', right: 12 },
   bottom: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    elevation: 8,
+    borderTopLeftRadius: RADIUS.sheet,
+    borderTopRightRadius: RADIUS.sheet,
+    paddingHorizontal: 16,
+    paddingTop: 10,
   },
-  tripRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, marginBottom: 8 },
-  eta: { fontSize: 28, fontWeight: '900', marginRight: 12 },
-  tripMeta: { flex: 1, fontSize: 18, fontWeight: '700' },
-  actions: { flexDirection: 'row', marginTop: 10, marginHorizontal: -3 },
-  action: { flex: 1, marginHorizontal: 3, paddingHorizontal: 2 },
+  tripRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, marginBottom: 10 },
+  eta: { fontSize: 30, fontFamily: font('700'), marginRight: 12, letterSpacing: -0.8, ...NUMERIC },
+  tripMeta: { flex: 1, fontSize: 17, fontFamily: font('500'), ...NUMERIC },
+  actions: { flexDirection: 'row', marginTop: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: -4 },
   mini: { flexDirection: 'row', alignItems: 'center', minHeight: 56 },
-  recenter: {
-    position: 'absolute',
-    right: 12,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
+  miniTrip: { flex: 1, minHeight: 56, justifyContent: 'center' },
+  miniEta: { fontSize: 24, fontFamily: font('700'), letterSpacing: -0.5, ...NUMERIC },
+  miniMeta: { fontSize: 17, fontFamily: font('600'), ...NUMERIC },
+  miniFuel: {
+    minHeight: 48,
+    minWidth: 96,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
   },
+  recenter: { position: 'absolute', right: 14, width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   recenterPill: {
     position: 'absolute',
-    right: 12,
+    right: 14,
     minHeight: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    paddingHorizontal: 22,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
   },
-  miniTrip: { flex: 1, minHeight: 56, justifyContent: 'center' },
-  miniEta: { fontSize: 24, fontWeight: '900' },
-  miniMeta: { fontSize: 18, fontWeight: '800' },
-  miniFuel: {
-    minHeight: 52,
-    minWidth: 96,
-    borderRadius: 26,
-    borderWidth: 2,
+  recenterLabel: { fontSize: 17, fontFamily: font('600'), marginLeft: 8 },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: RADIUS.control,
+    paddingVertical: 12,
     paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 10,
   },
+  toastText: { flex: 1, fontSize: 16, fontFamily: font('600'), marginLeft: 10, lineHeight: 21 },
 });

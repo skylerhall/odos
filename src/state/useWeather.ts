@@ -64,7 +64,9 @@ export function useWeather(opts: {
 
   useEffect(() => {
     load<boolean>('weatherFx', true).then(setFx);
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(setReduceMotion)
+      .catch(() => {});
     const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
     return () => sub.remove();
   }, []);
@@ -133,7 +135,7 @@ export function useWeather(opts: {
     return () => clearInterval(id);
   }, [route, refreshAhead]);
 
-  const shown = preview ? PREVIEW[preview] : current?.cond ?? null;
+  const shown = preview ? PREVIEW[preview] : (current?.cond ?? null);
   const isDay = current?.isDay ?? true;
   const fuelFactor = useMemo(
     () => (current && opts.fuelKind ? weatherFuelFactor(current.cond.sky, current.tempF, opts.fuelKind) : 1),
@@ -155,7 +157,7 @@ export function useWeather(opts: {
     reduceMotion,
     toggleFx,
     fuelFactor,
-    tip: shown ? drivingTip(shown, preview ? null : current?.tempF ?? null, preview ? null : current?.windMph ?? null) : null,
+    tip: shown ? drivingTip(shown, preview ? null : (current?.tempF ?? null), preview ? null : (current?.windMph ?? null)) : null,
     refresh: () => {
       refreshHere();
       refreshAhead();

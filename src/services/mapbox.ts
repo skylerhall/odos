@@ -99,11 +99,7 @@ export const CATEGORIES: Record<'gas' | 'hotel' | 'camp', string[]> = {
 };
 
 /** Category search near a point or inside a box. Unknown categories are skipped quietly. */
-export async function searchCategory(
-  kind: 'gas' | 'hotel' | 'camp',
-  where: { near?: LngLat; bbox?: BBox },
-  limit = 25,
-): Promise<Place[]> {
+export async function searchCategory(kind: 'gas' | 'hotel' | 'camp', where: { near?: LngLat; bbox?: BBox }, limit = 25): Promise<Place[]> {
   const near = where.near ?? (where.bbox ? center(where.bbox) : undefined);
   const results = await Promise.all(
     CATEGORIES[kind].map(async (cat) => {
@@ -112,7 +108,12 @@ export async function searchCategory(
         limit,
         language: 'en',
         proximity: near ? `${near[0]},${near[1]}` : undefined,
-        bbox: where.bbox ? where.bbox.flat().map((n) => n.toFixed(5)).join(',') : undefined,
+        bbox: where.bbox
+          ? where.bbox
+              .flat()
+              .map((n) => n.toFixed(5))
+              .join(',')
+          : undefined,
       };
       try {
         const data = await fetchJson<{ features: Feature[] }>(`${API}/search/searchbox/v1/category/${cat}?${qs(params)}`);
@@ -156,4 +157,3 @@ export function dedupe(places: Place[]): Place[] {
     return true;
   });
 }
-
