@@ -20,6 +20,14 @@ import type { Vehicle } from '../core/vehicles/types';
 import { nearbyGas, planGasStop, type GasPlan } from '../services/gas';
 import { getRoutes, hasToken } from '../services/mapbox';
 import { searchWhereTo } from '../services/placeSearch';
+import {
+  addRecent,
+  addShortcut as addShortcutTo,
+  normalizeShortcuts,
+  removeShortcut as removeShortcutFrom,
+  setShortcutPlace,
+  type Shortcut,
+} from '../core/saved';
 import { cachedRest, saveCorridor, type OfflineStatus } from '../services/offline';
 import { findRest, type RestKind } from '../services/rest';
 import { load, save } from '../services/storage';
@@ -60,6 +68,9 @@ export function useOdos() {
   const [offline, setOffline] = useState<OfflineStatus>({ state: 'idle', percent: 0 });
   const [toast, setToast] = useState<Toast | null>(null);
   const [pin, setPin] = useState<LngLat | null>(null);
+  // Saved on the phone: recent destinations and Home/Work/custom shortcuts.
+  const [recents, setRecents] = useState<Place[]>([]);
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>(() => normalizeShortcuts(null));
   /** MPG multiplier from current weather (rain, snow, cold). Set by useWeather. */
   const [efficiency, setEfficiency] = useState(1);
 
@@ -86,12 +97,16 @@ export function useOdos() {
   // ── persistence ──
   useEffect(() => {
     (async () => {
-      const [v, f, s] = await Promise.all([
+      const [v, f, s, rec, sc] = await Promise.all([
         load<Vehicle | null>('vehicle', null),
         load<FuelState | null>('fuel', null),
         load<Settings>('settings', DEFAULT_SETTINGS),
+        load<Place[]>('recents', []),
+        load<Shortcut[] | null>('shortcuts', null),
       ]);
       setVehicleState(v);
+      setRecents(Array.isArray(rec) ? rec : []);
+      setShortcuts(normalizeShortcuts(sc));
       setFuel(f ?? (v ? fullTank(v) : null));
       setSettings({ ...DEFAULT_SETTINGS, ...s, sim: false });
       setLoaded(true);
@@ -100,6 +115,12 @@ export function useOdos() {
   useEffect(() => {
     if (loaded) save('settings', settings);
   }, [settings, loaded]);
+  useEffect(() => {
+    if (loaded) save('recents', recents);
+  }, [recents, loaded]);
+  useEffect(() => {
+    if (loaded) save('shortcuts', shortcuts);
+  }, [shortcuts, loaded]);
   useEffect(() => {
     if (loaded) save('vehicle', vehicle);
   }, [vehicle, loaded]);
@@ -164,6 +185,7 @@ export function useOdos() {
   const navigateTo = useCallback(
     async (place: Place) => {
       tap();
+      if (place.kind !== 'custom') setRecents((r) => addRecent(r, place));
       setDestination(place);
       setStops([]);
       setGas(null);
@@ -222,7 +244,10 @@ export function useOdos() {
         return;
       }
       await reroute({ stops: next });
-      if (!auto) notify(`Added ${place.name} as a stop`, 'good');
+      if (!auto) {
+        setRecents((r) => addRecent(r, place));
+        notify(`Added ${place.name} as a stop`, 'good');
+      }
     },
     [navigateTo, notify, reroute],
   );
@@ -297,6 +322,28 @@ export function useOdos() {
     if (!v) return 0;
     return outlook(tankAt(v, eighths), v, { cruiseMph: live.current.route?.cruiseMph, efficiency: live.current.efficiency }).rangeMi;
   }, []);
+
+  // ── saved places ──
+  const saveShortcut = useCallback(
+    (key: string, place: Place) => {
+      setShortcuts((list) => setShortcutPlace(list, key, place));
+      const label = shortcuts.find((x) => x.key === key)?.label ?? 'Shortcut';
+      notify(`${label} saved: ${place.name}`, 'good');
+    },
+    [shortcuts, notify],
+  );
+  const removeShortcut = useCallback((key: string) => setShortcuts((list) => removeShortcutFrom(list, key)), []);
+  /** Adds an empty custom shortcut and returns its key (null if the list is full or the name blank). */
+  const addShortcut = useCallback(
+    (label: string): string | null => {
+      const res = addShortcutTo(shortcuts, label);
+      if (!res) return null;
+      setShortcuts(res.list);
+      return res.key;
+    },
+    [shortcuts],
+  );
+  const clearRecents = useCallback(() => setRecents([]), []);
 
   const fuelOutlook: FuelOutlook | null =
     vehicle && fuel
@@ -548,6 +595,8 @@ export function useOdos() {
     destination,
     /** The trip before the first quick change on the road, or null. */
     original,
+    recents,
+    shortcuts,
     stops,
     route,
     progress,
@@ -562,6 +611,10 @@ export function useOdos() {
       endTrip,
       markQuickChange,
       restoreOriginal,
+      saveShortcut,
+      removeShortcut,
+      addShortcut,
+      clearRecents,
       addStop,
       removeStop,
       setVehicle,

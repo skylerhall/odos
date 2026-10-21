@@ -360,6 +360,12 @@ function Main() {
               setSheet(null);
               a.addStop(pl);
             }}
+            shortcuts={odos.shortcuts}
+            recents={odos.recents}
+            onSaveShortcut={a.saveShortcut}
+            onRemoveShortcut={a.removeShortcut}
+            onAddShortcut={a.addShortcut}
+            onClearRecents={a.clearRecents}
           />
         ) : null}
         {openSheet === 'vehicle' ? (
