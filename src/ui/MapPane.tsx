@@ -32,6 +32,8 @@ export function MapPane(props: {
   /** Rain/snow drawn inside the map scene. */
   weather: Condition | null;
   weatherFx: boolean;
+  /** Trail Mode: the downloaded trail network and your breadcrumb track. */
+  trail?: { lines: GeoJSON.FeatureCollection | null; track: LngLat[] } | null;
 }) {
   const t = useTheme();
   const routeShape = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -69,7 +71,7 @@ export function MapPane(props: {
   return (
     <Mapbox.MapView
       style={StyleSheet.absoluteFill}
-      styleURL={props.night ? STYLE.night : STYLE.day}
+      styleURL={props.night ? STYLE.night : props.trail ? STYLE.trail : STYLE.day}
       scaleBarEnabled={false}
       compassEnabled
       logoEnabled
@@ -116,6 +118,45 @@ export function MapPane(props: {
             }}
           />
         </Mapbox.VectorSource>
+      ) : null}
+
+      {props.trail?.lines ? (
+        // Drawn from the downloaded data, so trails show even where the saved map has no detail.
+        <Mapbox.ShapeSource id="trails" shape={props.trail.lines}>
+          <Mapbox.LineLayer
+            id="trails-road"
+            filter={['==', ['get', 'kind'], 'road']}
+            style={{ lineColor: props.night ? '#8C96A6' : '#7D838C', lineWidth: 1.5, lineOpacity: 0.7 }}
+          />
+          <Mapbox.LineLayer
+            id="trails-track"
+            filter={['==', ['get', 'kind'], 'track']}
+            style={{ lineColor: props.night ? '#D9A464' : '#9C6A2C', lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 4], lineCap: 'round' }}
+          />
+          <Mapbox.LineLayer
+            id="trails-rough"
+            filter={['==', ['get', 'kind'], 'rough']}
+            style={{
+              lineColor: props.night ? '#FF8A50' : '#C2410C',
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 4],
+              lineDasharray: [2, 1],
+            }}
+          />
+          <Mapbox.LineLayer
+            id="trails-path"
+            filter={['==', ['get', 'kind'], 'path']}
+            style={{
+              lineColor: props.night ? '#E8C49A' : '#6B4423',
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 1.2, 16, 3],
+              lineDasharray: [1.5, 1],
+            }}
+          />
+        </Mapbox.ShapeSource>
+      ) : null}
+      {props.trail && props.trail.track.length > 1 ? (
+        <Mapbox.ShapeSource id="track" shape={{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: props.trail.track } }}>
+          <Mapbox.LineLayer id="track-line" style={{ lineColor: t.brand, lineWidth: 3.5, lineOpacity: 0.9, lineJoin: 'round', lineCap: 'round' }} />
+        </Mapbox.ShapeSource>
       ) : null}
 
       {routeShape ? (

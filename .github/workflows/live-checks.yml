@@ -1,0 +1,19 @@
+# Checks against real third-party APIs (they need the network, so they're not part of `npm test`).
+# Run by hand: Actions → "Live checks" → Run workflow.
+name: Live checks
+
+on:
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:live

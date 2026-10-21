@@ -19,17 +19,20 @@ import { formatCoords } from './core/share';
 import { hasToken } from './services/mapbox';
 import { load, save } from './services/storage';
 import { useOdos } from './state/useOdos';
+import { useTrail } from './state/useTrail';
 import { useWeather } from './state/useWeather';
 import { ActionTile, BigButton, Icon, IconButton, PressScale, Rail, RoundToggle, ThemeContext, useTheme } from './ui/controls';
 import { clockIn, duration, miles } from './ui/format';
 import { FuelPanel } from './ui/FuelPanel';
 import { ManeuverBanner } from './ui/ManeuverBanner';
 import { Speedometer } from './ui/Speedometer';
+import { TrailCard } from './ui/TrailCard';
 import { MapPane } from './ui/MapPane';
 import { PanelHandle } from './ui/PanelHandle';
 import { DestinationSheet } from './ui/sheets/DestinationSheet';
 import { GasSheet } from './ui/sheets/GasSheet';
 import { RestSheet, type RestFrom } from './ui/sheets/RestSheet';
+import { TrailSheet } from './ui/sheets/TrailSheet';
 import { TripSheet } from './ui/sheets/TripSheet';
 import { FuelSheet } from './ui/sheets/FuelSheet';
 import { VehicleSheet } from './ui/sheets/VehicleSheet';
@@ -42,7 +45,7 @@ import { DAY, elevate, font, NIGHT, NUMERIC, RADIUS } from './ui/theme';
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ fade: true, duration: 300 });
 
-type SheetName = 'dest' | 'vehicle' | 'fuel' | 'fuelAsk' | 'rest' | 'gas' | 'trip' | 'weather' | null;
+type SheetName = 'dest' | 'vehicle' | 'fuel' | 'fuelAsk' | 'rest' | 'gas' | 'trip' | 'weather' | 'trail' | null;
 
 export default function App() {
   return (
@@ -92,6 +95,8 @@ function Main() {
     speak: a.speak,
     notify: a.notify,
   });
+
+  const trail = useTrail({ fix: odos.fix, destination: odos.destination, route: odos.route, actions: a });
 
   // Rain, snow and cold cut real-world range; feed that into the fuel model.
   const { setEfficiency } = a;
@@ -153,6 +158,7 @@ function Main() {
             bottomInset={panelH + 24}
             weather={wx.shown}
             weatherFx={wx.fxOn}
+            trail={trail.active ? { lines: trail.lines, track: trail.track.coords } : null}
           />
         ) : (
           <View style={[styles.center, { backgroundColor: theme.panel, padding: 24 }]}>
@@ -195,6 +201,15 @@ function Main() {
             </PressScale>
           )}
           <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
+          {trail.active && !trip ? (
+            <TrailCard
+              trail={trail}
+              heading={odos.fix?.heading ?? null}
+              destinationName={odos.destination?.name ?? null}
+              onOpen={() => setSheet('trail')}
+              onRetryRoute={() => odos.destination && a.navigateTo(odos.destination)}
+            />
+          ) : null}
           {odos.permission === 'denied' && !settings.sim ? (
             <BigButton
               icon="map-marker-off"
@@ -328,7 +343,14 @@ function Main() {
                   tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'accent'}
                   onPress={() => setSheet('gas')}
                 />
-                <ActionTile icon="bed" label="Rest ≤2h" onPress={() => setSheet('rest')} />
+                <ActionTile icon="bed" label="Rest" hint="Hotels, campgrounds and free lots within 2 hours" onPress={() => setSheet('rest')} />
+                <ActionTile
+                  icon="hiking"
+                  label="Trails"
+                  tone={trail.active ? 'brand' : undefined}
+                  hint="Trail Mode: offline trail navigation on foot or off-road"
+                  onPress={() => setSheet('trail')}
+                />
                 <ActionTile icon="share-variant" label="Share" onPress={a.shareLocation} />
                 <ActionTile icon="content-copy" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} />
               </View>
@@ -416,6 +438,7 @@ function Main() {
           />
         ) : null}
         <WeatherSheet visible={openSheet === 'weather'} onClose={closeSheet} wx={wx} />
+        {openSheet === 'trail' ? <TrailSheet onClose={closeSheet} trail={trail} here={odos.fix?.coord ?? null} /> : null}
         <TripSheet
           visible={openSheet === 'trip'}
           onClose={closeSheet}

@@ -32,10 +32,11 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"tests/live/**\"",
     "typecheck": "tsc --noEmit",
     "apk": "bash scripts/build-apk.sh",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:live": "vitest run tests/live"
   },
   "private": true
 }

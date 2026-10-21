@@ -54,7 +54,7 @@ browsing.
 ## Things that are *not* collection
 - **Share location / Copy coordinates**: done only when the user taps, and sent only where they choose.
 - **Vehicle year/make/model** sent to fueleconomy.gov: describes a car model, not a person.
-- **Settings, vehicle, fuel level, shortcuts (Home, Work…), recent places, offline maps**: stored only on
+- **Settings, vehicle, fuel level, shortcuts (Home, Work…), recent places, offline maps, Trail Mode areas and tracks**: stored only on
   the device.
 - **Automatic night map**: sunset and sunrise are calculated on the phone; nothing is sent.
 - **Spoken directions**: the phone's built-in text-to-speech.

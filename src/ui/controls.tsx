@@ -149,9 +149,10 @@ export function IconButton(props: { icon: IconName; label: string; onPress: () =
 }
 
 /** Quick action in the bottom bar: a tinted icon well with a short label under it. */
-export function ActionTile(props: { icon: IconName; label: string; onPress: () => void; hint?: string; tone?: 'accent' | 'amber' }) {
+export function ActionTile(props: { icon: IconName; label: string; onPress: () => void; hint?: string; tone?: 'accent' | 'amber' | 'brand' }) {
   const t = useTheme();
   const amber = props.tone === 'amber';
+  const brand = props.tone === 'brand';
   return (
     <PressScale
       accessibilityRole="button"
@@ -161,8 +162,8 @@ export function ActionTile(props: { icon: IconName; label: string; onPress: () =
       scaleTo={0.92}
       style={styles.tile}
     >
-      <View style={[styles.tileWell, { backgroundColor: amber ? t.amber : t.accentSoft }]}>
-        <Icon name={props.icon} size={24} color={amber ? t.onAmber : t.accent} />
+      <View style={[styles.tileWell, { backgroundColor: amber ? t.amber : brand ? t.brand : t.accentSoft }]}>
+        <Icon name={props.icon} size={24} color={amber ? t.onAmber : brand ? t.onAccent : t.accent} />
       </View>
       <Text style={[styles.tileLabel, { color: t.text }]} numberOfLines={1}>
         {props.label}

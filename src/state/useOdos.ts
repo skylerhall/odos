@@ -164,6 +164,12 @@ export function useOdos() {
     }
   }, [fuel, loaded]);
 
+  // ── Trail Mode hooks (see state/useTrail.ts) ──
+  // While set, routes come from the downloaded trail network instead of Mapbox, and walking doesn't
+  // burn the vehicle's fuel.
+  const trailRouter = useRef<{ route: (points: LngLat[]) => Route | null; burnFuel: boolean } | null>(null);
+  const fixListeners = useRef(new Set<(f: Fix) => void>());
+
   // ── routing ──
   const reroute = useCallback(
     async (next: { dest?: Place | null; stops?: Stop[]; avoidTolls?: boolean } = {}): Promise<Route | null> => {
@@ -172,7 +178,7 @@ export function useOdos() {
       const avoidTolls = next.avoidTolls ?? live.current.settings.avoidTolls;
       const here = live.current.fix;
       if (!dest) return null;
-      if (!hasToken()) {
+      if (!hasToken() && !trailRouter.current) {
         notify('Add your Mapbox token to .env to get directions (see README)', 'danger');
         return null;
       }
@@ -180,10 +186,23 @@ export function useOdos() {
       const seq = ++routeSeq.current;
       setRouting(true);
       try {
-        const routes = await getRoutes([from, ...via.map((s) => s.coord), dest.coord], {
-          heading: here?.heading ?? undefined,
-          avoidTolls,
-        });
+        const trail = trailRouter.current;
+        const points: LngLat[] = [from, ...via.map((s) => s.coord), dest.coord];
+        let routes: Route[];
+        if (trail) {
+          const r = trail.route(points);
+          if (!r) {
+            // Off the network: no route, but the destination stays so the compass can point to it.
+            tracker.current = null;
+            setRoute(null);
+            setProgress(null);
+            notify('No trail goes there from here. Follow the compass arrow.', 'danger');
+            return null;
+          }
+          routes = [r];
+        } else {
+          routes = await getRoutes(points, { heading: here?.heading ?? undefined, avoidTolls });
+        }
         if (seq !== routeSeq.current) return null; // a newer request superseded this one
         const r = routes[0];
         // Always answer a new trip or a flipped toggle; on automatic reroutes, say it once, not on
@@ -223,7 +242,7 @@ export function useOdos() {
       const r = await reroute({ dest: place, stops: [] });
       if (!r) return;
       speak(`Starting route to ${place.name}. ${fmtMiles(r.distance / MI)}, about ${fmtDuration(r.duration)}.`);
-      saveCorridor(r, live.current.settings.night, setOffline);
+      if (!trailRouter.current) saveCorridor(r, live.current.settings.night, setOffline);
     },
     [reroute, speak],
   );
@@ -375,6 +394,34 @@ export function useOdos() {
   );
   const clearRecents = useCallback(() => setRecents([]), []);
 
+  /** Trail Mode turns trail routing on (or off with null). */
+  const setTrailRouter = useCallback((r: { route: (points: LngLat[]) => Route | null; burnFuel: boolean } | null) => {
+    trailRouter.current = r;
+  }, []);
+  /** Get every GPS fix (the breadcrumb track). Returns the unsubscribe function. */
+  const subscribeFix = useCallback((cb: (f: Fix) => void) => {
+    fixListeners.current.add(cb);
+    return () => {
+      fixListeners.current.delete(cb);
+    };
+  }, []);
+  /** Follow a route built elsewhere (back to start along your track). */
+  const followRoute = useCallback(
+    (r: Route, dest: Place) => {
+      tap();
+      routeSeq.current++;
+      setDestination(dest);
+      setStops([]);
+      setPin(null);
+      tracker.current = new NavTracker(r);
+      simAlong.current = 0;
+      setRoute(r);
+      setProgress(null);
+      speak(r.steps[0]?.maneuver.instruction ?? `Heading to ${dest.name}`);
+    },
+    [speak],
+  );
+
   const fuelOutlook: FuelOutlook | null =
     vehicle && fuel
       ? outlook(fuel, vehicle, {
@@ -412,7 +459,7 @@ export function useOdos() {
 
   // The 50-mile buffer: alert once, then auto-insert a gas stop 15–30 miles ahead.
   useEffect(() => {
-    if (!fuelOutlook?.inBuffer || bufferHandled.current) return;
+    if (!fuelOutlook?.inBuffer || bufferHandled.current || trailRouter.current) return;
     bufferHandled.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     (async () => {
@@ -441,9 +488,10 @@ export function useOdos() {
       const prev = lastFix.current;
       lastFix.current = f;
       setFix(f);
+      fixListeners.current.forEach((l) => l(f));
       const { vehicle: v, stops: via } = live.current;
 
-      if (v && prev) {
+      if (v && prev && (trailRouter.current?.burnFuel ?? true)) {
         const d = haversine(prev.coord, f.coord);
         // Ignore GPS jumps and jitter while parked.
         if (d > 2 && d < 3000 && (f.accuracy == null || f.accuracy < 60)) {
@@ -660,6 +708,9 @@ export function useOdos() {
       endTrip,
       markQuickChange,
       restoreOriginal,
+      setTrailRouter,
+      subscribeFix,
+      followRoute,
       saveShortcut,
       removeShortcut,
       addShortcut,

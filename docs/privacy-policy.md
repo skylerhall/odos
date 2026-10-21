@@ -29,7 +29,7 @@ points along your route) to these services:
 | **Mapbox** | Map area being viewed; route start, stops and destination; nearby point for searches | Map tiles, directions and traffic, place search, drive times, offline maps |
 | **Open-Meteo** | Your approximate position (rounded to about 10 m) and points along your route | Current weather and the forecast along your route |
 | **U.S. National Weather Service** | Your approximate position | Official weather alerts |
-| **OpenStreetMap Overpass API** | A point and search radius | Rest areas, free overnight parking and free campsites |
+| **OpenStreetMap Overpass API** | A point and search radius | Rest areas, free overnight parking and free campsites; trails and back roads when you download a Trail Mode area |
 | **Recreation.gov (RIDB)** | A point and search radius | Federal campgrounds |
 
 ### What you type
@@ -48,7 +48,7 @@ the Mapbox logo on the map, then choose the telemetry option. See
 
 ### What stays on your phone
 ODOS saves these only on your device, so they're still there next time you open the app:
-your vehicle and fuel level, your shortcuts (such as Home and Work) and recent places, your settings (such as night mode, voice, weather effects and avoiding
+your vehicle and fuel level, your shortcuts (such as Home and Work) and recent places, downloaded Trail Mode areas and the track Trail Mode records while it is on, your settings (such as night mode, voice, weather effects and avoiding
 tolls), and offline maps and nearby places saved for your current trip. Uninstalling ODOS, or
 clearing its storage in your phone's settings, deletes all of it. Spoken directions use your phone's
 built-in text-to-speech, and the automatic night map works out sunset and sunrise on your

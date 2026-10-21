@@ -54,6 +54,18 @@ export const OFFLINE = {
 export const STYLE = {
   day: 'mapbox://styles/mapbox/streets-v12',
   night: 'mapbox://styles/mapbox/dark-v11',
+  /** Trail Mode by day: topo map with trails, contours and hillshade. At night it uses `night`. */
+  trail: 'mapbox://styles/mapbox/outdoors-v12',
   /** Live traffic tiles drawn on top of the base style when the Traffic toggle is on. */
   trafficTiles: 'mapbox://mapbox.mapbox-traffic-v1',
+};
+
+export const TRAIL = {
+  /** Download sizes offered, miles from where you are. Bigger areas keep less map detail. */
+  radiusMiles: [5, 10, 20] as const,
+  /** Most detailed map zoom saved for each size (16 shows every switchback; 14 is the overview). */
+  maxZoom: { 5: 16, 10: 15, 20: 14 } as Record<number, number>,
+  minZoom: 10,
+  /** Warn about a dead end or gate this far ahead, meters. */
+  warnMeters: { hike: 400, offroad: 1600 },
 };

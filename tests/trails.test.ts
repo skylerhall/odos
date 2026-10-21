@@ -153,7 +153,7 @@ describe('Overpass download', () => {
         { type: 'node', id: 51, lat: 39.71, lon: -105.52, tags: { highway: 'trailhead' } },
       ],
     };
-    const a = parseOverpass(json, { id: 'x', name: 'X', center: ORIGIN, radiusM: 5000, createdAt: 1 });
+    const a = parseOverpass(json as Parameters<typeof parseOverpass>[0], { id: 'x', name: 'X', center: ORIGIN, radiusM: 5000, createdAt: 1 });
     expect(a.ways).toHaveLength(2); // way 3 has one known node
     expect(a.ways[0]).toMatchObject({ hw: 'track', grade: 4, fourWd: true, name: 'FR 9' });
     expect(a.ways[1]).toMatchObject({ hw: 'path', motor: true });
