@@ -71,6 +71,11 @@ export function MapPane(props: {
       scaleBarEnabled={false}
       compassEnabled
       logoEnabled
+      // Keep the Mapbox logo and (i) button above the bottom panel: Mapbox's terms require both to be
+      // visible, and (i) is where users opt out of Mapbox telemetry (see docs/privacy-policy.md).
+      logoPosition={{ bottom: props.bottomInset, left: 12 }}
+      attributionEnabled
+      attributionPosition={{ bottom: props.bottomInset, left: 104 }}
       onLongPress={(f) => props.onLongPress(f.geometry.coordinates as LngLat)}
       onCameraChanged={(s) => {
         if (s.gestures.isGestureActive) props.onUserPan();
