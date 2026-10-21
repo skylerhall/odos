@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FUEL } from '../src/config';
-import { burn, fullTank, gasStopWindow, outlook, speedFactor } from '../src/core/fuel';
+import { burn, fullTank, gasStopWindow, gaugeLabel, outlook, speedFactor, tankAt, tankEighths } from '../src/core/fuel';
 import { buildLine, destinationPoint, haversine, MI, pointAt, sliceLine, snapToLine, type LngLat } from '../src/core/geo';
 import { LaneAdvisor, scoreLanes } from '../src/core/lanes';
 import { simulateLanes } from '../src/core/laneSim';
@@ -228,5 +228,21 @@ describe('share', () => {
   it('formats coordinates lat, lon and builds a universal link', () => {
     expect(formatCoords([-104.990251, 39.739236])).toBe('39.739236, -104.990251');
     expect(mapsLink([-104.99, 39.74])).toBe('https://maps.google.com/?q=39.740000,-104.990000');
+  });
+});
+
+describe('setting the tank by hand', () => {
+  it('sets gallons in eighths of the tank and reads them back', () => {
+    const half = tankAt(camry, 4);
+    expect(half.gallons).toBe(5);
+    expect(tankEighths(half, camry)).toBe(4);
+    expect(tankEighths(tankAt(camry, 99), camry)).toBe(8);
+    expect(tankEighths(burn(fullTank(camry), camry, 30 * MI, 50), camry)).toBe(7); // 1 gal of 10 used
+  });
+
+  it('labels the gauge like a dashboard', () => {
+    expect([0, 1, 2, 4, 6, 8].map((e) => gaugeLabel(e))).toEqual(['E', '1/8', '1/4', '1/2', '3/4', 'F']);
+    expect(gaugeLabel(3, false, true)).toBe('three eighths');
+    expect(gaugeLabel(3, true)).toBe('38%');
   });
 });

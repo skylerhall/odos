@@ -12,6 +12,8 @@ export function FuelPanel(props: {
   outlook: FuelOutlook | null;
   onFillUp: () => void;
   onPickVehicle: () => void;
+  /** Tapping the gauge: set the level by hand or change vehicle. */
+  onSetLevel: () => void;
 }) {
   const t = useTheme();
   const { vehicle, outlook: o } = props;
@@ -41,9 +43,10 @@ export function FuelPanel(props: {
       <PressScale
         style={{ flex: 1 }}
         scaleTo={0.98}
-        onPress={props.onPickVehicle}
+        onPress={props.onSetLevel}
         accessibilityRole="button"
-        accessibilityLabel={`${vehicle.make} ${vehicle.model}. Range ${miles(o.rangeMi)}. ${status}. Tap to change vehicle.`}
+        accessibilityLabel={`${vehicle.make} ${vehicle.model}. Range ${miles(o.rangeMi)}. ${status}.`}
+        accessibilityHint={`Set the ${ev ? 'battery' : 'fuel'} level or change vehicle`}
       >
         <View style={styles.topLine}>
           <Icon name={ev ? 'battery-charging' : 'gas-station'} size={22} color={o.inBuffer ? t.amber : t.muted} />

@@ -23,6 +23,30 @@ export function fullTank(vehicle: Vehicle): FuelState {
   return { gallons: vehicle.tankGal, milesSinceFill: 0, lastFillAt: Date.now() };
 }
 
+/** Gauge positions, empty to full, the way drivers read a tank: E, 1/8, 1/4 … F. */
+export const EIGHTHS = 8;
+const GAUGE = ['E', '1/8', '1/4', '3/8', '1/2', '5/8', '3/4', '7/8', 'F'];
+const SPOKEN = ['empty', 'one eighth', 'one quarter', 'three eighths', 'half', 'five eighths', 'three quarters', 'seven eighths', 'full'];
+
+/** The tank set by hand, e.g. starting out on half a tank. */
+export function tankAt(vehicle: Vehicle, eighths: number): FuelState {
+  const e = Math.max(0, Math.min(EIGHTHS, Math.round(eighths)));
+  return { gallons: (vehicle.tankGal * e) / EIGHTHS, milesSinceFill: 0, lastFillAt: Date.now() };
+}
+
+/** Where the needle sits now, to the nearest eighth. */
+export function tankEighths(state: FuelState, vehicle: Vehicle): number {
+  if (vehicle.tankGal <= 0) return 0;
+  return Math.max(0, Math.min(EIGHTHS, Math.round((state.gallons / vehicle.tankGal) * EIGHTHS)));
+}
+
+/** "3/8" for gas, "38%" for a battery; `spoken` gives words for screen readers. */
+export function gaugeLabel(eighths: number, ev = false, spoken = false): string {
+  const e = Math.max(0, Math.min(EIGHTHS, Math.round(eighths)));
+  if (ev) return `${Math.round((e / EIGHTHS) * 100)}%`;
+  return spoken ? SPOKEN[e] : GAUGE[e];
+}
+
 /**
  * Burn fuel for a distance driven at a given speed. `efficiency` is any extra multiplier on MPG,
  * e.g. the weather factor (0.9 = 10% worse in snow).

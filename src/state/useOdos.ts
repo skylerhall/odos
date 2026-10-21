@@ -8,7 +8,7 @@ import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Linking, Share } from 'react-native';
 import { NAV } from '../config';
-import { burn, fullTank, outlook, type FuelOutlook, type FuelState } from '../core/fuel';
+import { burn, fullTank, gaugeLabel, outlook, tankAt, type FuelOutlook, type FuelState } from '../core/fuel';
 import { haversine, MI, pointAt, type LngLat } from '../core/geo';
 import { LaneAdvisor, type LaneAdvice, type LaneGuide } from '../core/lanes';
 import { simulateLanes } from '../core/laneSim';
@@ -18,7 +18,8 @@ import type { Route } from '../core/route';
 import { formatCoords, shareMessage } from '../core/share';
 import type { Vehicle } from '../core/vehicles/types';
 import { nearbyGas, planGasStop, type GasPlan } from '../services/gas';
-import { getRoutes, hasToken, searchPlaces } from '../services/mapbox';
+import { getRoutes, hasToken } from '../services/mapbox';
+import { searchWhereTo } from '../services/placeSearch';
 import { cachedRest, saveCorridor, type OfflineStatus } from '../services/offline';
 import { findRest, type RestKind } from '../services/rest';
 import { load, save } from '../services/storage';
@@ -242,6 +243,35 @@ export function useOdos() {
       await reroute({ stops: kept });
     }
   }, [notify, reroute, speak]);
+
+  // Set the tank by hand (e.g. starting on half a tank). Like "Filled up", it drops any auto gas stop
+  // planned for the old level; if the new level is low, the fuel monitor plans a fresh one.
+  const setFuelLevel = useCallback(
+    async (eighths: number) => {
+      const v = live.current.vehicle;
+      if (!v) return;
+      tap();
+      const next = tankAt(v, eighths);
+      setFuel(next);
+      bufferHandled.current = false;
+      setGas(null);
+      const o = outlook(next, v, { cruiseMph: live.current.route?.cruiseMph, efficiency: live.current.efficiency });
+      notify(`${v.fuel === 'ev' ? 'Battery' : 'Tank'} set to ${gaugeLabel(eighths, v.fuel === 'ev')}. ${fmtMiles(o.rangeMi)} of range.`, 'good');
+      const kept = live.current.stops.filter((s) => !s.auto);
+      if (kept.length !== live.current.stops.length) {
+        setStops(kept);
+        await reroute({ stops: kept });
+      }
+    },
+    [notify, reroute],
+  );
+
+  /** Range for a tank level, for the slider's live preview. */
+  const rangeAt = useCallback((eighths: number) => {
+    const v = live.current.vehicle;
+    if (!v) return 0;
+    return outlook(tankAt(v, eighths), v, { cruiseMph: live.current.route?.cruiseMph, efficiency: live.current.efficiency }).rangeMi;
+  }, []);
 
   const fuelOutlook: FuelOutlook | null =
     vehicle && fuel
@@ -480,7 +510,7 @@ export function useOdos() {
     return findRest(point, kinds, await cachedRest());
   }, []);
 
-  const search = useCallback((q: string) => searchPlaces(q, live.current.fix?.coord), []);
+  const search = useCallback((q: string) => searchWhereTo(q, live.current.fix?.coord), []);
 
   return {
     loaded,
@@ -507,6 +537,8 @@ export function useOdos() {
       removeStop,
       setVehicle,
       fillUp,
+      setFuelLevel,
+      rangeAt,
       findGas,
       shareLocation,
       copyCoords,

@@ -9,9 +9,10 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as SplashScreen from 'expo-splash-screen';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tankEighths } from './core/fuel';
 import { MI } from './core/geo';
 import { formatCoords } from './core/share';
 import { hasToken } from './services/mapbox';
@@ -28,6 +29,7 @@ import { DestinationSheet } from './ui/sheets/DestinationSheet';
 import { GasSheet } from './ui/sheets/GasSheet';
 import { RestSheet, type RestFrom } from './ui/sheets/RestSheet';
 import { TripSheet } from './ui/sheets/TripSheet';
+import { FuelSheet } from './ui/sheets/FuelSheet';
 import { VehicleSheet } from './ui/sheets/VehicleSheet';
 import { WeatherSheet } from './ui/sheets/WeatherSheet';
 import { WeatherChip } from './ui/WeatherChip';
@@ -38,7 +40,7 @@ import { DAY, elevate, font, NIGHT, NUMERIC, RADIUS } from './ui/theme';
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ fade: true, duration: 300 });
 
-type SheetName = 'dest' | 'vehicle' | 'rest' | 'gas' | 'trip' | 'weather' | null;
+type SheetName = 'dest' | 'vehicle' | 'fuel' | 'fuelAsk' | 'rest' | 'gas' | 'trip' | 'weather' | null;
 
 export default function App() {
   return (
@@ -102,6 +104,8 @@ function Main() {
     setSheet(null);
     setFirstRunDone(true);
   };
+  // After picking a vehicle, ask how full the tank is instead of assuming full.
+  const pickedVehicle = useRef(false);
 
   const restFroms = useMemo<RestFrom[]>(() => {
     const f: RestFrom[] = [];
@@ -282,7 +286,13 @@ function Main() {
           ) : null}
           {minimized ? null : (
             <>
-              <FuelPanel vehicle={odos.vehicle} outlook={odos.fuelOutlook} onFillUp={a.fillUp} onPickVehicle={() => setSheet('vehicle')} />
+              <FuelPanel
+                vehicle={odos.vehicle}
+                outlook={odos.fuelOutlook}
+                onFillUp={a.fillUp}
+                onPickVehicle={() => setSheet('vehicle')}
+                onSetLevel={() => setSheet('fuel')}
+              />
               <View style={[styles.actions, { borderTopColor: theme.border }]}>
                 <ActionTile
                   icon={trip ? 'map-marker-plus' : 'magnify'}
@@ -321,7 +331,31 @@ function Main() {
             }}
           />
         ) : null}
-        {openSheet === 'vehicle' ? <VehicleSheet onClose={closeSheet} onPick={a.setVehicle} /> : null}
+        {openSheet === 'vehicle' ? (
+          <VehicleSheet
+            onPick={(v) => {
+              a.setVehicle(v);
+              pickedVehicle.current = true;
+            }}
+            onClose={() => {
+              if (!pickedVehicle.current) return closeSheet();
+              pickedVehicle.current = false;
+              setFirstRunDone(true);
+              setSheet('fuelAsk');
+            }}
+          />
+        ) : null}
+        {(openSheet === 'fuel' || openSheet === 'fuelAsk') && odos.vehicle ? (
+          <FuelSheet
+            onClose={closeSheet}
+            vehicle={odos.vehicle}
+            current={odos.fuel ? tankEighths(odos.fuel, odos.vehicle) : 8}
+            rangeAt={a.rangeAt}
+            onSave={a.setFuelLevel}
+            onChangeVehicle={() => setSheet('vehicle')}
+            firstTime={openSheet === 'fuelAsk'}
+          />
+        ) : null}
         {openSheet === 'rest' ? (
           <RestSheet
             onClose={closeSheet}

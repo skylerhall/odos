@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import type { Place } from '../../core/places';
-import { ResultRow, Sheet, useTheme } from '../controls';
+import type { SearchResponse, SearchResult } from '../../services/placeSearch';
+import { type IconName, ResultRow, Sheet, useTheme } from '../controls';
+import { distance, duration } from '../format';
 import { useAsync } from '../useAsync';
 import { font } from '../theme';
 
-/** "Where to?" — type an address or place; results update as you type. */
+const KIND_ICON: Partial<Record<Place['kind'], IconName>> = { gas: 'gas-station', hotel: 'bed', camp: 'tent', freepark: 'parking' };
+
+const howFar = (p: SearchResult) =>
+  p.meters == null ? undefined : p.driveSeconds != null ? `${duration(p.driveSeconds)} · ${distance(p.meters)}` : `${distance(p.meters)} away`;
+
+/**
+ * "Where to?" — type an address or place; results update as you type. "Nearest gas station",
+ * "coffee near me" and the like list what's closest by drive time.
+ */
 export function DestinationSheet(props: {
   onClose: () => void;
-  search: (q: string) => Promise<Place[]>;
+  search: (q: string) => Promise<SearchResponse>;
   onGo: (p: Place) => void;
   onAddStop: (p: Place) => void;
   hasTrip: boolean;
@@ -26,14 +36,15 @@ export function DestinationSheet(props: {
   const { search } = props;
   const query = debounced.length >= 3 ? debounced : '';
   const { data, loading, error } = useAsync(query ? () => search(query) : null, query);
-  const results = query ? (data ?? []) : [];
+  const results = query ? (data?.places ?? []) : [];
+  const heading = query ? data?.heading : null;
 
   return (
     <Sheet visible title="Where to?" onClose={props.onClose}>
       <TextInput
         value={q}
         onChangeText={setQ}
-        placeholder="Address, place, or city"
+        placeholder="Address, place, or “nearest gas”"
         placeholderTextColor={t.muted}
         autoFocus
         returnKeyType="search"
@@ -53,10 +64,23 @@ export function DestinationSheet(props: {
         {error ? (
           <Text style={{ color: t.danger, fontSize: 16, fontFamily: font('400') }}>No signal. Search needs a connection.</Text>
         ) : null}
+        {heading && !loading ? (
+          <Text style={{ color: t.muted, fontSize: 15, fontFamily: font('700'), marginTop: 4 }}>{heading.toUpperCase()}</Text>
+        ) : null}
+        {query && data && !results.length && !loading ? (
+          <Text style={{ color: t.text, fontSize: 16, fontFamily: font('400') }}>Nothing found. Try different words.</Text>
+        ) : null}
       </View>
       {results.map((p) => (
         <View key={p.id}>
-          <ResultRow title={p.name} subtitle={p.address} icon="map-marker-outline" action="Go" onAction={() => props.onGo(p)} />
+          <ResultRow
+            title={p.name}
+            subtitle={p.address}
+            detail={howFar(p)}
+            icon={KIND_ICON[p.kind] ?? 'map-marker-outline'}
+            action="Go"
+            onAction={() => props.onGo(p)}
+          />
           {props.hasTrip ? (
             <ResultRow
               title=""

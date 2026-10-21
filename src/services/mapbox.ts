@@ -122,9 +122,19 @@ export const CATEGORIES: Record<'gas' | 'hotel' | 'camp', string[]> = {
 
 /** Category search near a point or inside a box. Unknown categories are skipped quietly. */
 export async function searchCategory(kind: 'gas' | 'hotel' | 'camp', where: { near?: LngLat; bbox?: BBox }, limit = 25): Promise<Place[]> {
+  return searchCategories(CATEGORIES[kind], kind, where, limit);
+}
+
+/** Search any Mapbox categories (e.g. "coffee", "pharmacy"); results are tagged with `kind`. */
+export async function searchCategories(
+  categories: string[],
+  kind: PlaceKind,
+  where: { near?: LngLat; bbox?: BBox },
+  limit = 25,
+): Promise<Place[]> {
   const near = where.near ?? (where.bbox ? center(where.bbox) : undefined);
   const results = await Promise.all(
-    CATEGORIES[kind].map(async (cat) => {
+    categories.map(async (cat) => {
       const params = {
         access_token: MAPBOX_TOKEN,
         limit,
