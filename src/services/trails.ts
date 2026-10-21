@@ -6,8 +6,8 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { STYLE, TRAIL } from '../config';
 import { destinationPoint, haversine, milesToMeters, type BBox, type LngLat } from '../core/geo';
 import { parseOverpass, trailQuery, type TrailArea } from '../core/trails';
-import { fetchJson, OVERPASS_HEADERS } from './http';
 import { hasToken } from './mapbox';
+import { overpass } from './overpass';
 import { load, save } from './storage';
 
 /** What the list of downloaded areas shows, without reading each (large) area file. */
@@ -15,7 +15,6 @@ export type TrailAreaInfo = Pick<TrailArea, 'id' | 'name' | 'center' | 'radiusM'
 
 export type DownloadProgress = { stage: 'trails' | 'map' | 'done'; percent: number };
 
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const PACK_PREFIX = 'odos-trail-';
 const INDEX_KEY = 'trailAreas';
 
@@ -63,22 +62,7 @@ export async function downloadTrailArea(center: LngLat, radiusMi: number, onProg
   const id = `a${createdAt.toString(36)}`;
   onProgress({ stage: 'trails', percent: 0 });
 
-  let json: Parameters<typeof parseOverpass>[0] | null = null;
-  let lastError: unknown = null;
-  for (const url of OVERPASS) {
-    try {
-      json = await fetchJson(url, {
-        method: 'POST',
-        headers: OVERPASS_HEADERS,
-        body: `data=${encodeURIComponent(trailQuery(center, radiusM))}`,
-        timeoutMs: 210000,
-      });
-      break;
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  if (!json) throw lastError instanceof Error ? lastError : new Error('Trail download failed');
+  const json = await overpass<Parameters<typeof parseOverpass>[0]>(trailQuery(center, radiusM), { timeoutMs: 210000 });
 
   const area = parseOverpass(json, { id, name: '', center, radiusM, createdAt });
   if (!area.ways.length) throw new Error('No trails or back roads found here');

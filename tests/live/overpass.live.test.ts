@@ -4,20 +4,15 @@
 import { expect, it } from 'vitest';
 import { haversine, type LngLat } from '../../src/core/geo';
 import { buildGraph, parseOverpass, routeOnTrails, trailQuery } from '../../src/core/trails';
-import { OVERPASS_HEADERS } from '../../src/services/http';
+import { overpass } from '../../src/services/overpass';
 
 const CHAUTAUQUA: LngLat = [-105.2925, 39.999]; // trailhead in Boulder, CO
 const RADIUS = 1500;
 
 it('downloads, parses and routes real trails', async () => {
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: OVERPASS_HEADERS,
-    body: `data=${encodeURIComponent(trailQuery(CHAUTAUQUA, RADIUS))}`,
-  });
-  const text = await res.text();
-  expect(res.status, text.slice(0, 500)).toBe(200);
-  const area = parseOverpass(JSON.parse(text), { id: 'live', name: 'live', center: CHAUTAUQUA, radiusM: RADIUS, createdAt: 0 });
+  // Same helper the app uses, retries and second server included.
+  const json = await overpass<Parameters<typeof parseOverpass>[0]>(trailQuery(CHAUTAUQUA, RADIUS), { timeoutMs: 100000, retryDelaysMs: [5000, 15000] });
+  const area = parseOverpass(json, { id: 'live', name: 'live', center: CHAUTAUQUA, radiusM: RADIUS, createdAt: 0 });
   const kinds = new Map<string, number>();
   area.ways.forEach((w) => kinds.set(w.hw, (kinds.get(w.hw) ?? 0) + 1));
   console.log(`ways ${area.ways.length}, nodes ${area.coords.length / 2}, gates ${area.gates.length}, barriers ${area.barriers.length}, places ${area.pois.length}, ${(JSON.stringify(area).length / 1e3).toFixed(0)} kB`);

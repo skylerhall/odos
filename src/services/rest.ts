@@ -3,7 +3,8 @@
 import { REST, RIDB_KEY } from '../config';
 import { MI, type LngLat } from '../core/geo';
 import { estimateDrive, withinRestLimit, type Place, type RestOption } from '../core/places';
-import { fetchJson, OVERPASS_HEADERS, qs } from './http';
+import { fetchJson, qs } from './http';
+import { overpass } from './overpass';
 import { dedupe, driveTimes, hasToken, searchCategory } from './mapbox';
 
 export type RestKind = 'hotel' | 'camp' | 'freepark';
@@ -33,12 +34,8 @@ async function freeParking(at: LngLat, radiusM: number): Promise<Place[]> {
     nwr["brand"~"^Walmart",i]["shop"~"supermarket|department_store"]${a};
     nwr["brand"~"^Cracker Barrel$",i]["amenity"="restaurant"]${a};
   );out center 80;`;
-  const data = await fetchJson<{ elements: OsmElement[] }>('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: OVERPASS_HEADERS,
-    body: `data=${encodeURIComponent(query)}`,
-    timeoutMs: 20000,
-  });
+  // Short timeout and one quick retry: this runs while you wait on the Rest sheet.
+  const data = await overpass<{ elements: OsmElement[] }>(query, { timeoutMs: 20000, retryDelaysMs: [1500] });
   return data.elements.flatMap((el): Place[] => {
     const lat = el.lat ?? el.center?.lat;
     const lon = el.lon ?? el.center?.lon;
