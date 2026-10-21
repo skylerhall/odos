@@ -58,7 +58,7 @@ browsing.
 - **Spoken directions**: the phone's built-in text-to-speech.
 
 ## Other App content forms
-- **Privacy policy**: the URL where `docs/privacy-policy.md` is published.
+- **Privacy policy**: https://skylerhall.github.io/odos-privacy/
 - **Ads**: No ads.
 - **App access**: All functionality is available without special access (no login).
 - **Target audience**: 18 and over (a driving app). This keeps it out of the Families program.
