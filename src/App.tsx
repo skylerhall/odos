@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tankEighths } from './core/fuel';
 import { MI } from './core/geo';
@@ -117,13 +117,7 @@ function Main() {
   // The "Where to?" sheet was opened from the trip bar: a change to the route while driving.
   const [quickChange, setQuickChange] = useState(false);
   const [topH, setTopH] = useState(90);
-  // The side rail and the re-center button share the right edge; on short screens or with a tall
-  // panel they'd overlap, so the button moves to the left of the rail.
-  const [rail, setRail] = useState({ w: 72, h: 0 });
-  const { height: screenH } = useWindowDimensions();
   const railTop = insets.top + 8 + topH + 10;
-  const recenterTop = screenH - (panelH + 12) - RECENTER_SIZE;
-  const recenterBesideRail = rail.h > 0 && railTop + rail.h + 8 > recenterTop;
   // After picking a vehicle, ask how full the tank is instead of assuming full.
   const pickedVehicle = useRef(false);
 
@@ -209,7 +203,11 @@ function Main() {
               <Text style={[styles.searchText, { color: theme.muted }]}>{odos.routing ? 'Finding route…' : 'Where to?'}</Text>
             </PressScale>
           )}
-          <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
+          {/* Weather on the left; re-center on the right, centered over the toggle rail below it. */}
+          <View style={styles.chipRow} pointerEvents="box-none">
+            <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
+            <RecenterButton following={follow} onPress={() => setFollow(true)} />
+          </View>
           {trail.active && !trip ? (
             <TrailCard
               trail={trail}
@@ -250,11 +248,7 @@ function Main() {
         </View>
 
         {/* ── side rail of one-tap toggles ── */}
-        <View
-          style={[styles.rail, { top: railTop }]}
-          pointerEvents="box-none"
-          onLayout={(e) => setRail({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
-        >
+        <View style={[styles.rail, { top: railTop }]} pointerEvents="box-none">
           {minimized ? null : (
             <Rail>
               <RoundToggle
@@ -384,14 +378,6 @@ function Main() {
             <Speedometer mph={odos.fix.mph} limit={trip && p ? speedLimitAt(trip, p.along) : null} />
           </View>
         ) : null}
-        <RecenterButton
-          following={follow}
-          driving={!!trip}
-          bottom={panelH + 12}
-          right={recenterBesideRail ? 12 + rail.w + 10 : 14}
-          compact={recenterBesideRail}
-          onPress={() => setFollow(true)}
-        />
 
         {openSheet === 'dest' ? (
           <DestinationSheet
@@ -548,34 +534,18 @@ function TripBar(props: { onSearch: () => void; original: { name: string } | nul
   );
 }
 
-function RecenterButton({
-  following,
-  driving,
-  bottom,
-  right,
-  compact,
-  onPress,
-}: {
-  following: boolean;
-  driving: boolean;
-  bottom: number;
-  right: number;
-  /** Round button only (no "Re-center" pill), when it has to sit beside the toggle rail. */
-  compact: boolean;
-  onPress: () => void;
-}) {
+/** Top right, beside the weather: white while the map follows you, filled blue once you've panned away. */
+function RecenterButton({ following, onPress }: { following: boolean; onPress: () => void }) {
   const t = useTheme();
-  const pill = driving && !following && !compact;
   return (
     <PressScale
       onPress={onPress}
       scaleTo={0.9}
       accessibilityRole="button"
       accessibilityLabel={following ? 'Map is centered on your location' : 'Re-center map on your location'}
-      style={[pill ? styles.recenterPill : styles.recenter, { bottom, right, backgroundColor: following ? t.bg : t.accent }, elevate(t, 2)]}
+      style={[styles.recenter, { backgroundColor: following ? t.bg : t.accent }, elevate(t, 2)]}
     >
-      <Icon name={pill ? 'navigation-variant' : 'crosshairs-gps'} size={pill ? 22 : 26} color={following ? t.accent : t.onAccent} />
-      {pill ? <Text style={[styles.recenterLabel, { color: t.onAccent }]}>Re-center</Text> : null}
+      <Icon name="crosshairs-gps" size={26} color={following ? t.accent : t.onAccent} />
     </PressScale>
   );
 }
@@ -657,24 +627,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chipRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   recenter: {
-    position: 'absolute',
+    marginTop: 8,
+    // The rail below is 72 wide; this centers the button over it.
+    marginRight: (72 - RECENTER_SIZE) / 2,
     width: RECENTER_SIZE,
     height: RECENTER_SIZE,
     borderRadius: RECENTER_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recenterPill: {
-    position: 'absolute',
-    minHeight: 56,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recenterLabel: { fontSize: 17, fontFamily: font('600'), marginLeft: 8 },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',

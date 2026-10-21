@@ -73,7 +73,9 @@ export function MapPane(props: {
       style={StyleSheet.absoluteFill}
       styleURL={props.night ? STYLE.night : props.trail ? STYLE.trail : STYLE.day}
       scaleBarEnabled={false}
-      compassEnabled
+      // No floating compass: the camera follows your heading while driving, re-center resets it,
+      // and Trail Mode has its own arrow to the destination.
+      compassEnabled={false}
       logoEnabled
       // Keep the Mapbox logo and (i) button above the bottom panel: Mapbox's terms require both to be
       // visible, and (i) is where users opt out of Mapbox telemetry (see docs/privacy-policy.md).
