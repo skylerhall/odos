@@ -45,12 +45,14 @@ export type TrailPoi = { name: string; kind: string; coord: LngLat };
 
 // ── download ──
 
-const HIGHWAYS = 'path|footway|track|bridleway|cycleway|steps|pedestrian|unclassified|service|residential|tertiary|living_street';
+// Trails, tracks and the back roads that join them. Town streets, alleys and driveways (residential,
+// service, living_street) are left out: in a big area near a town they'd be most of the download.
+const HIGHWAYS = 'path|footway|track|bridleway|cycleway|steps|pedestrian|unclassified|tertiary';
 
 /** Overpass QL for everything Trail Mode needs inside a circle. */
 export function trailQuery(center: LngLat, radiusM: number): string {
   const a = `(around:${Math.round(radiusM)},${center[1].toFixed(5)},${center[0].toFixed(5)})`;
-  return `[out:json][timeout:120];
+  return `[out:json][timeout:180];
 way["highway"~"^(${HIGHWAYS})$"]${a}->.w;
 .w out body qt;
 node(w.w)->.n;

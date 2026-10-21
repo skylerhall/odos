@@ -71,7 +71,7 @@ export async function downloadTrailArea(center: LngLat, radiusMi: number, onProg
         method: 'POST',
         headers: OVERPASS_HEADERS,
         body: `data=${encodeURIComponent(trailQuery(center, radiusM))}`,
-        timeoutMs: 150000,
+        timeoutMs: 210000,
       });
       break;
     } catch (e) {
