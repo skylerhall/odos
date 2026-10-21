@@ -39,7 +39,8 @@
         {
           "locationWhenInUsePermission": "ODOS uses your location for turn-by-turn directions, fuel tracking, and sharing where you are."
         }
-      ]
+      ],
+      "./plugins/withReleaseSigning"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
