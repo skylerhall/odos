@@ -8,8 +8,9 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MI } from './core/geo';
 import { formatCoords } from './core/share';
@@ -32,6 +33,10 @@ import { WeatherSheet } from './ui/sheets/WeatherSheet';
 import { WeatherChip } from './ui/WeatherChip';
 import { WeatherOverlay } from './ui/WeatherOverlay';
 import { DAY, elevate, font, NIGHT, NUMERIC, RADIUS } from './ui/theme';
+
+// Keep the dark logo splash up until saved settings and fonts are loaded, then fade it out.
+SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ fade: true, duration: 300 });
 
 type SheetName = 'dest' | 'vehicle' | 'rest' | 'gas' | 'trip' | 'weather' | null;
 
@@ -57,6 +62,10 @@ function Main() {
   const odos = useOdos();
   const { settings, actions: a } = odos;
   const theme = settings.night ? NIGHT : DAY;
+  const ready = odos.loaded && (fontsLoaded || !!fontError);
+  useEffect(() => {
+    if (ready) SplashScreen.hide();
+  }, [ready]);
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState<SheetName>(null);
   const [follow, setFollow] = useState(true);
@@ -108,13 +117,8 @@ function Main() {
   const remainingS = p?.remainingSeconds ?? trip?.duration ?? 0;
   const remainingMi = (p?.remainingMeters ?? trip?.distance ?? 0) / MI;
 
-  if (!odos.loaded || (!fontsLoaded && !fontError)) {
-    return (
-      <View style={[styles.center, { backgroundColor: theme.bg }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
-      </View>
-    );
-  }
+  // The splash screen covers this until ready.
+  if (!ready) return <View style={styles.splash} />;
 
   return (
     <ThemeContext.Provider value={theme}>
@@ -417,6 +421,7 @@ function ToastBar({ text, tone, onDone }: { text: string; tone: 'info' | 'amber'
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  splash: { flex: 1, backgroundColor: '#101317' },
   top: { position: 'absolute', left: 12, right: 12 },
   searchPill: { minHeight: 60, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
   searchText: { fontSize: 19, fontFamily: font('500'), marginLeft: 12, letterSpacing: -0.2 },

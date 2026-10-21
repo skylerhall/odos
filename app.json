@@ -22,6 +22,19 @@
     "plugins": [
       "@rnmapbox/maps",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 288,
+          "resizeMode": "contain",
+          "backgroundColor": "#101317",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#101317"
+          }
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "ODOS uses your location for turn-by-turn directions, fuel tracking, and sharing where you are."
