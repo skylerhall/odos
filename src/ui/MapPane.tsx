@@ -27,8 +27,10 @@ export function MapPane(props: {
   pin: LngLat | null;
   onLongPress: (coord: LngLat) => void;
   onUserPan: () => void;
-  /** Height of the bottom panel, so the driving camera keeps your position above it. */
-  bottomInset: number;
+  /** Map area covered by the app's panels (bottom panel in portrait, left column in landscape). */
+  inset: { left: number; bottom: number };
+  /** Extra top padding for the driving camera (landscape keeps your position low on screen). */
+  topPadding: number;
   /** Rain/snow drawn inside the map scene. */
   weather: Condition | null;
   weatherFx: boolean;
@@ -79,9 +81,9 @@ export function MapPane(props: {
       logoEnabled
       // Keep the Mapbox logo and (i) button above the bottom panel: Mapbox's terms require both to be
       // visible, and (i) is where users opt out of Mapbox telemetry (see docs/privacy-policy.md).
-      logoPosition={{ bottom: props.bottomInset, left: 12 }}
+      logoPosition={{ bottom: props.inset.bottom, left: props.inset.left + 12 }}
       attributionEnabled
-      attributionPosition={{ bottom: props.bottomInset, left: 104 }}
+      attributionPosition={{ bottom: props.inset.bottom, left: props.inset.left + 104 }}
       onLongPress={(f) => props.onLongPress(f.geometry.coordinates as LngLat)}
       onCameraChanged={(s) => {
         if (s.gestures.isGestureActive) props.onUserPan();
@@ -92,7 +94,11 @@ export function MapPane(props: {
         followUserMode={driving ? Mapbox.UserTrackingMode.FollowWithCourse : Mapbox.UserTrackingMode.Follow}
         followZoomLevel={driving ? 16 : 13}
         followPitch={driving ? 50 : 0}
-        followPadding={{ paddingBottom: driving ? props.bottomInset : 0 }}
+        followPadding={{
+          paddingLeft: props.inset.left,
+          paddingBottom: driving ? props.inset.bottom : 0,
+          paddingTop: driving ? props.topPadding : 0,
+        }}
         defaultSettings={{ centerCoordinate: props.fix?.coord ?? [-98.5, 39.8], zoomLevel: props.fix ? 13 : 3.5 }}
       />
       {props.sim && props.fix ? <Mapbox.CustomLocationProvider coordinate={props.fix.coord} heading={props.fix.heading ?? 0} /> : null}

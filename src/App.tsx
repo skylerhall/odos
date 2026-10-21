@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tankEighths } from './core/fuel';
 import { MI } from './core/geo';
@@ -118,6 +118,11 @@ function Main() {
   const [quickChange, setQuickChange] = useState(false);
   const [topH, setTopH] = useState(90);
   const railTop = insets.top + 8 + topH + 10;
+  // Landscape (phone on its side, e.g. a dash mount): controls in a left column, map on the right.
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const landscape = screenW > screenH;
+  const sideW = Math.min(400, Math.round(screenW * 0.42));
+  const mapInset = landscape ? { left: insets.left + 12 + sideW + 12, bottom: insets.bottom + 8 } : { left: 0, bottom: panelH + 24 };
   // After picking a vehicle, ask how full the tank is instead of assuming full.
   const pickedVehicle = useRef(false);
 
@@ -134,6 +139,217 @@ function Main() {
   const p = odos.progress;
   const remainingS = p?.remainingSeconds ?? trip?.duration ?? 0;
   const remainingMi = (p?.remainingMeters ?? trip?.distance ?? 0) / MI;
+
+  // ── screen pieces, arranged below for portrait or landscape ──
+  // Turn banner and trip bar while navigating, else the search box.
+  const topMain = (
+    <>
+      {trip ? (
+        <>
+          <ManeuverBanner progress={p} lanes={odos.lanes} rerouting={odos.routing} />
+          <TripBar
+            onSearch={() => {
+              setQuickChange(true);
+              setSheet('dest');
+            }}
+            original={odos.original?.destination ?? null}
+            onRestore={() => {
+              setFollow(true);
+              a.restoreOriginal();
+            }}
+            onEnd={a.endTrip}
+          />
+        </>
+      ) : (
+        <PressScale
+          accessibilityRole="search"
+          accessibilityLabel="Where to? Search for a destination"
+          onPress={() => setSheet('dest')}
+          scaleTo={0.98}
+          style={[styles.searchPill, { backgroundColor: theme.bg }, elevate(theme, 2)]}
+        >
+          <Icon name="magnify" size={26} color={theme.brand} />
+          <Text style={[styles.searchText, { color: theme.muted }]}>{odos.routing ? 'Finding route…' : 'Where to?'}</Text>
+        </PressScale>
+      )}
+    </>
+  );
+  // Weather chip with the re-center button.
+  const chipRow = (
+    <>
+      {/* Weather on the left; re-center on the right, centered over the toggle rail below it. */}
+      <View style={styles.chipRow} pointerEvents="box-none">
+        <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
+        <RecenterButton following={follow} onPress={() => setFollow(true)} />
+      </View>
+    </>
+  );
+  // Trail card, location-off warning and the dropped-pin bar.
+  const topExtras = (
+    <>
+      {trail.active && !trip ? (
+        <TrailCard
+          trail={trail}
+          heading={odos.fix?.heading ?? null}
+          destinationName={odos.destination?.name ?? null}
+          onOpen={() => setSheet('trail')}
+          onRetryRoute={() => odos.destination && a.navigateTo(odos.destination)}
+        />
+      ) : null}
+      {odos.permission === 'denied' && !settings.sim ? (
+        <BigButton
+          icon="map-marker-off"
+          label="Location is off. Tap to allow it"
+          tone="danger"
+          onPress={a.requestLocation}
+          style={{ marginTop: 8 }}
+        />
+      ) : null}
+      {odos.pin ? (
+        <View style={[styles.pinBar, { backgroundColor: theme.bg }, elevate(theme, 2)]}>
+          <Icon name="map-marker" size={22} color={theme.accent} />
+          <Text style={[styles.pinText, { color: theme.text }]} numberOfLines={1}>
+            {formatCoords(odos.pin, 5)}
+          </Text>
+          <BigButton
+            label="Go"
+            tone="accent"
+            onPress={() => {
+              if (trip) a.markQuickChange();
+              a.navigateTo({ id: `pin:${odos.pin}`, name: 'Dropped pin', coord: odos.pin!, kind: 'custom' });
+            }}
+            style={styles.pinBtn}
+          />
+          <BigButton icon="bed" label="Rest" onPress={() => setSheet('rest')} style={styles.pinBtn} />
+          <IconButton icon="close" label="Remove the pin" onPress={() => a.setPin(null)} />
+        </View>
+      ) : null}
+    </>
+  );
+  // The one-tap toggles.
+  const rail = (
+    <>
+      {minimized ? null : (
+        <Rail horizontal={landscape}>
+          <RoundToggle
+            icon={settings.voice ? 'volume-high' : 'volume-off'}
+            label="Voice"
+            on={settings.voice}
+            onPress={() => a.toggle('voice')}
+          />
+          <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
+          <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
+          <RoundToggle
+            icon="boom-gate"
+            label={settings.avoidTolls ? 'No tolls' : 'Tolls'}
+            a11yLabel="Avoid tolls"
+            slash={settings.avoidTolls}
+            on={settings.avoidTolls}
+            onPress={a.toggleTolls}
+          />
+        </Rail>
+      )}
+    </>
+  );
+  // Trip, fuel and the action tiles.
+  const panel = (
+    <>
+      {odos.toast ? <ToastBar key={odos.toast.id} text={odos.toast.text} tone={odos.toast.tone} onDone={a.dismissToast} /> : null}
+      <PanelHandle minimized={minimized} onChange={setMinimized} />
+      {minimized ? (
+        <View style={styles.mini}>
+          <Pressable
+            onPress={() => setSheet(trip ? 'trip' : 'dest')}
+            accessibilityRole="button"
+            accessibilityLabel={
+              trip
+                ? `Arrive ${clockIn(remainingS)}, ${miles(remainingMi)} to go. Tap for trip details.`
+                : 'Where to? Search for a destination'
+            }
+            style={styles.miniTrip}
+          >
+            {trip ? (
+              <Text style={[styles.miniEta, { color: theme.good }]} numberOfLines={1}>
+                {clockIn(remainingS)}
+                <Text style={[styles.miniMeta, { color: theme.muted }]}> · {miles(remainingMi)}</Text>
+              </Text>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name="magnify" size={22} color={theme.brand} />
+                <Text style={[styles.miniMeta, { color: theme.muted, marginLeft: 8 }]}>Where to?</Text>
+              </View>
+            )}
+          </Pressable>
+          {odos.fuelOutlook ? (
+            <Pressable
+              onPress={() => setMinimized(false)}
+              accessibilityRole="button"
+              accessibilityLabel={`Fuel range ${miles(odos.fuelOutlook.rangeMi)}${odos.fuelOutlook.inBuffer ? ', fuel stop needed' : ''}. Tap to show the menu.`}
+              style={[styles.miniFuel, { backgroundColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.panel }]}
+            >
+              <Icon
+                name={odos.vehicle?.fuel === 'ev' ? 'battery-charging' : 'gas-station'}
+                size={20}
+                color={odos.fuelOutlook.inBuffer ? theme.onAmber : theme.muted}
+              />
+              <Text style={[styles.miniMeta, { color: odos.fuelOutlook.inBuffer ? theme.onAmber : theme.text, marginLeft: 6 }]}>
+                {miles(odos.fuelOutlook.rangeMi)}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      {!minimized && trip ? (
+        <Pressable
+          onPress={() => setSheet('trip')}
+          accessibilityRole="button"
+          accessibilityLabel={`Arrive ${clockIn(remainingS)}, ${duration(remainingS)}, ${miles(remainingMi)}. ${odos.stops.length} stops. Tap for trip details.`}
+          style={styles.tripRow}
+        >
+          <Text style={[styles.eta, { color: theme.good }]}>{clockIn(remainingS)}</Text>
+          <Text style={[styles.tripMeta, { color: theme.text }]}>
+            {duration(remainingS)} · {miles(remainingMi)}
+            {odos.stops.length ? ` · ${odos.stops.length} stop${odos.stops.length > 1 ? 's' : ''}` : ''}
+          </Text>
+          <Icon name="chevron-right" size={26} color={theme.muted} />
+        </Pressable>
+      ) : null}
+      {minimized ? null : (
+        <>
+          <FuelPanel
+            vehicle={odos.vehicle}
+            outlook={odos.fuelOutlook}
+            onFillUp={a.fillUp}
+            onPickVehicle={() => setSheet('vehicle')}
+            onSetLevel={() => setSheet('fuel')}
+          />
+          <View style={[styles.actions, { borderTopColor: theme.border }]}>
+            <ActionTile
+              icon={trip ? 'map-marker-plus' : 'magnify'}
+              label={trip ? 'Add stop' : 'Where to'}
+              onPress={() => setSheet('dest')}
+            />
+            <ActionTile
+              icon="gas-station"
+              label="Gas"
+              tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'accent'}
+              onPress={() => setSheet('gas')}
+            />
+            <ActionTile icon="bed" label="Rest" hint="Hotels, campgrounds and free lots within 2 hours" onPress={() => setSheet('rest')} />
+            <ActionTile
+              icon="hiking"
+              label="Trails"
+              tone={trail.active ? 'brand' : undefined}
+              hint="Trail Mode: offline trail navigation on foot or off-road"
+              onPress={() => setSheet('trail')}
+            />
+            <ActionTile icon="share-variant" label="Share" onPress={a.shareLocation} />
+            <ActionTile icon="content-copy" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} />
+          </View>
+        </>
+      )}
+    </>
+  );
 
   // The splash screen covers this until ready.
   if (!ready) return <View style={styles.splash} />;
@@ -158,7 +374,9 @@ function Main() {
               setFollow(false);
             }}
             onUserPan={() => setFollow(false)}
-            bottomInset={panelH + 24}
+            inset={mapInset}
+            // While driving, keep your position low in the visible map so more road shows ahead.
+            topPadding={landscape ? Math.round(screenH * 0.35) : 0}
             weather={wx.shown}
             weatherFx={wx.fxOn}
             trail={trail.active ? { lines: trail.lines, track: trail.track.coords } : null}
@@ -173,208 +391,53 @@ function Main() {
 
         <WeatherOverlay cond={wx.shown} isDay={wx.isDay && !settings.night} enabled={wx.fxOn} />
 
-        {/* ── top ── */}
-        <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none" onLayout={(e) => setTopH(e.nativeEvent.layout.height)}>
-          {trip ? (
-            <>
-              <ManeuverBanner progress={p} lanes={odos.lanes} rerouting={odos.routing} />
-              <TripBar
-                onSearch={() => {
-                  setQuickChange(true);
-                  setSheet('dest');
-                }}
-                original={odos.original?.destination ?? null}
-                onRestore={() => {
-                  setFollow(true);
-                  a.restoreOriginal();
-                }}
-                onEnd={a.endTrip}
-              />
-            </>
-          ) : (
-            <PressScale
-              accessibilityRole="search"
-              accessibilityLabel="Where to? Search for a destination"
-              onPress={() => setSheet('dest')}
-              scaleTo={0.98}
-              style={[styles.searchPill, { backgroundColor: theme.bg }, elevate(theme, 2)]}
+        {landscape ? (
+          <>
+            {/* ── landscape: controls in a column on the left, map on the right ── */}
+            <View
+              style={[styles.side, { left: insets.left + 12, top: insets.top + 8, bottom: insets.bottom + 8, width: sideW }]}
+              pointerEvents="box-none"
             >
-              <Icon name="magnify" size={26} color={theme.brand} />
-              <Text style={[styles.searchText, { color: theme.muted }]}>{odos.routing ? 'Finding route…' : 'Where to?'}</Text>
-            </PressScale>
-          )}
-          {/* Weather on the left; re-center on the right, centered over the toggle rail below it. */}
-          <View style={styles.chipRow} pointerEvents="box-none">
-            <WeatherChip wx={wx} onPress={() => setSheet('weather')} />
-            <RecenterButton following={follow} onPress={() => setFollow(true)} />
-          </View>
-          {trail.active && !trip ? (
-            <TrailCard
-              trail={trail}
-              heading={odos.fix?.heading ?? null}
-              destinationName={odos.destination?.name ?? null}
-              onOpen={() => setSheet('trail')}
-              onRetryRoute={() => odos.destination && a.navigateTo(odos.destination)}
-            />
-          ) : null}
-          {odos.permission === 'denied' && !settings.sim ? (
-            <BigButton
-              icon="map-marker-off"
-              label="Location is off. Tap to allow it"
-              tone="danger"
-              onPress={a.requestLocation}
-              style={{ marginTop: 8 }}
-            />
-          ) : null}
-          {odos.pin ? (
-            <View style={[styles.pinBar, { backgroundColor: theme.bg }, elevate(theme, 2)]}>
-              <Icon name="map-marker" size={22} color={theme.accent} />
-              <Text style={[styles.pinText, { color: theme.text }]} numberOfLines={1}>
-                {formatCoords(odos.pin, 5)}
-              </Text>
-              <BigButton
-                label="Go"
-                tone="accent"
-                onPress={() => {
-                  if (trip) a.markQuickChange();
-                  a.navigateTo({ id: `pin:${odos.pin}`, name: 'Dropped pin', coord: odos.pin!, kind: 'custom' });
-                }}
-                style={styles.pinBtn}
-              />
-              <BigButton icon="bed" label="Rest" onPress={() => setSheet('rest')} style={styles.pinBtn} />
-              <IconButton icon="close" label="Remove the pin" onPress={() => a.setPin(null)} />
-            </View>
-          ) : null}
-        </View>
-
-        {/* ── side rail of one-tap toggles ── */}
-        <View style={[styles.rail, { top: railTop }]} pointerEvents="box-none">
-          {minimized ? null : (
-            <Rail>
-              <RoundToggle
-                icon={settings.voice ? 'volume-high' : 'volume-off'}
-                label="Voice"
-                on={settings.voice}
-                onPress={() => a.toggle('voice')}
-              />
-              <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
-              <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
-              <RoundToggle
-                icon="boom-gate"
-                label={settings.avoidTolls ? 'No tolls' : 'Tolls'}
-                a11yLabel="Avoid tolls"
-                slash={settings.avoidTolls}
-                on={settings.avoidTolls}
-                onPress={a.toggleTolls}
-              />
-            </Rail>
-          )}
-        </View>
-
-        {/* ── bottom panel ── */}
-        <View
-          onLayout={(e) => setPanelH(Math.round(e.nativeEvent.layout.height))}
-          style={[styles.bottom, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 10 }, elevate(theme, 3)]}
-        >
-          {odos.toast ? <ToastBar key={odos.toast.id} text={odos.toast.text} tone={odos.toast.tone} onDone={a.dismissToast} /> : null}
-          <PanelHandle minimized={minimized} onChange={setMinimized} />
-          {minimized ? (
-            <View style={styles.mini}>
-              <Pressable
-                onPress={() => setSheet(trip ? 'trip' : 'dest')}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  trip
-                    ? `Arrive ${clockIn(remainingS)}, ${miles(remainingMi)} to go. Tap for trip details.`
-                    : 'Where to? Search for a destination'
-                }
-                style={styles.miniTrip}
-              >
-                {trip ? (
-                  <Text style={[styles.miniEta, { color: theme.good }]} numberOfLines={1}>
-                    {clockIn(remainingS)}
-                    <Text style={[styles.miniMeta, { color: theme.muted }]}> · {miles(remainingMi)}</Text>
-                  </Text>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="magnify" size={22} color={theme.brand} />
-                    <Text style={[styles.miniMeta, { color: theme.muted, marginLeft: 8 }]}>Where to?</Text>
-                  </View>
-                )}
-              </Pressable>
-              {odos.fuelOutlook ? (
-                <Pressable
-                  onPress={() => setMinimized(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Fuel range ${miles(odos.fuelOutlook.rangeMi)}${odos.fuelOutlook.inBuffer ? ', fuel stop needed' : ''}. Tap to show the menu.`}
-                  style={[styles.miniFuel, { backgroundColor: odos.fuelOutlook.inBuffer ? theme.amber : theme.panel }]}
-                >
-                  <Icon
-                    name={odos.vehicle?.fuel === 'ev' ? 'battery-charging' : 'gas-station'}
-                    size={20}
-                    color={odos.fuelOutlook.inBuffer ? theme.onAmber : theme.muted}
-                  />
-                  <Text style={[styles.miniMeta, { color: odos.fuelOutlook.inBuffer ? theme.onAmber : theme.text, marginLeft: 6 }]}>
-                    {miles(odos.fuelOutlook.rangeMi)}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-          {!minimized && trip ? (
-            <Pressable
-              onPress={() => setSheet('trip')}
-              accessibilityRole="button"
-              accessibilityLabel={`Arrive ${clockIn(remainingS)}, ${duration(remainingS)}, ${miles(remainingMi)}. ${odos.stops.length} stops. Tap for trip details.`}
-              style={styles.tripRow}
-            >
-              <Text style={[styles.eta, { color: theme.good }]}>{clockIn(remainingS)}</Text>
-              <Text style={[styles.tripMeta, { color: theme.text }]}>
-                {duration(remainingS)} · {miles(remainingMi)}
-                {odos.stops.length ? ` · ${odos.stops.length} stop${odos.stops.length > 1 ? 's' : ''}` : ''}
-              </Text>
-              <Icon name="chevron-right" size={26} color={theme.muted} />
-            </Pressable>
-          ) : null}
-          {minimized ? null : (
-            <>
-              <FuelPanel
-                vehicle={odos.vehicle}
-                outlook={odos.fuelOutlook}
-                onFillUp={a.fillUp}
-                onPickVehicle={() => setSheet('vehicle')}
-                onSetLevel={() => setSheet('fuel')}
-              />
-              <View style={[styles.actions, { borderTopColor: theme.border }]}>
-                <ActionTile
-                  icon={trip ? 'map-marker-plus' : 'magnify'}
-                  label={trip ? 'Add stop' : 'Where to'}
-                  onPress={() => setSheet('dest')}
-                />
-                <ActionTile
-                  icon="gas-station"
-                  label="Gas"
-                  tone={odos.fuelOutlook?.inBuffer ? 'amber' : 'accent'}
-                  onPress={() => setSheet('gas')}
-                />
-                <ActionTile icon="bed" label="Rest" hint="Hotels, campgrounds and free lots within 2 hours" onPress={() => setSheet('rest')} />
-                <ActionTile
-                  icon="hiking"
-                  label="Trails"
-                  tone={trail.active ? 'brand' : undefined}
-                  hint="Trail Mode: offline trail navigation on foot or off-road"
-                  onPress={() => setSheet('trail')}
-                />
-                <ActionTile icon="share-variant" label="Share" onPress={a.shareLocation} />
-                <ActionTile icon="content-copy" label="Copy" hint="Copies your coordinates" onPress={a.copyCoords} />
+              <View pointerEvents="box-none" onLayout={(e) => setTopH(e.nativeEvent.layout.height)}>
+                {topMain}
+                {topExtras}
               </View>
-            </>
-          )}
-        </View>
+              <View style={[styles.sidePanel, { backgroundColor: theme.bg }, elevate(theme, 3)]}>
+                <ScrollView contentContainerStyle={styles.sidePanelContent} keyboardShouldPersistTaps="handled">
+                  {panel}
+                </ScrollView>
+              </View>
+            </View>
+            <View style={[styles.sideRight, { top: insets.top + 8, right: insets.right + 12 }]} pointerEvents="box-none">
+              {rail}
+              {chipRow}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none" onLayout={(e) => setTopH(e.nativeEvent.layout.height)}>
+              {topMain}
+              {chipRow}
+              {topExtras}
+            </View>
+            <View style={[styles.rail, { top: railTop }]} pointerEvents="box-none">
+              {rail}
+            </View>
+            <View
+              onLayout={(e) => setPanelH(Math.round(e.nativeEvent.layout.height))}
+              style={[styles.bottom, { backgroundColor: theme.bg, paddingBottom: insets.bottom + 10 }, elevate(theme, 3)]}
+            >
+              {panel}
+            </View>
+          </>
+        )}
 
         {odos.fix && (trip || odos.fix.mph >= 3) ? (
-          // Bottom-left, above the Mapbox logo; the re-center button is on the right.
-          <View style={[styles.speedo, { bottom: panelH + 56 }]} pointerEvents="none">
+          // Above the Mapbox logo: bottom left in portrait, bottom right of the map in landscape.
+          <View
+            style={landscape ? [styles.speedo, { bottom: insets.bottom + 44, right: insets.right + 12 }] : [styles.speedo, { bottom: panelH + 56, left: 12 }]}
+            pointerEvents="none"
+          >
             <Speedometer mph={odos.fix.mph} limit={trip && p ? speedLimitAt(trip, p.along) : null} />
           </View>
         ) : null}
@@ -599,7 +662,12 @@ const styles = StyleSheet.create({
   pinText: { flex: 1, fontSize: 15, fontFamily: font('500'), marginLeft: 8, ...NUMERIC },
   pinBtn: { minWidth: 64, marginLeft: 6, paddingHorizontal: 12 },
   rail: { position: 'absolute', right: 12 },
-  speedo: { position: 'absolute', left: 12 },
+  speedo: { position: 'absolute' },
+  side: { position: 'absolute' },
+  // Takes the rest of the column below the banner; scrolls when the screen is short.
+  sidePanel: { flexShrink: 1, marginTop: 8, borderRadius: RADIUS.card, overflow: 'hidden' },
+  sidePanelContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 10 },
+  sideRight: { position: 'absolute', alignItems: 'flex-end' },
   bottom: {
     position: 'absolute',
     left: 0,
@@ -627,7 +695,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  chipRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   recenter: {
     marginTop: 8,
     // The rail below is 72 wide; this centers the button over it.

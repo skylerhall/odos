@@ -173,9 +173,9 @@ export function ActionTile(props: { icon: IconName; label: string; onPress: () =
 }
 
 /** Floating card that groups the map's on/off toggles, Google Maps style. */
-export function Rail({ children }: { children: ReactNode }) {
+export function Rail({ children, horizontal }: { children: ReactNode; horizontal?: boolean }) {
   const t = useTheme();
-  return <View style={[styles.rail, { backgroundColor: t.bg }, elevate(t, 2)]}>{children}</View>;
+  return <View style={[styles.rail, horizontal && styles.railRow, { backgroundColor: t.bg }, elevate(t, 2)]}>{children}</View>;
 }
 
 /** One on/off toggle inside the Rail. Reads as "Voice, switch, on" to screen readers. */
@@ -276,7 +276,9 @@ function useKeyboardOverlap(ref: RefObject<HostInstance | null>) {
 export function Sheet(props: { visible: boolean; title: string; onClose: () => void; children: ReactNode; scroll?: boolean }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
+  const { height: screenH, width: screenW } = useWindowDimensions();
+  // Landscape: a panel down the left side instead of a sheet from the bottom.
+  const side = screenW > screenH;
   const holder = useRef<HostInstance>(null);
   const { overlap, onLayout } = useKeyboardOverlap(holder);
   const onClose = useRef(props.onClose);
@@ -299,27 +301,32 @@ export function Sheet(props: { visible: boolean; title: string; onClose: () => v
   if (!props.visible) return null;
   const onBackdrop = () => (Keyboard.isVisible() ? Keyboard.dismiss() : props.onClose());
   // Leave room for the status bar above, and the keyboard (or the gesture bar) below.
-  const maxHeight = Math.max(200, screenH - overlap - insets.top - 24);
+  const maxHeight = side
+    ? Math.max(160, screenH - overlap - insets.top - insets.bottom - 16)
+    : Math.max(200, screenH - overlap - insets.top - 24);
   return (
     <View ref={holder} onLayout={onLayout} style={styles.sheetLayer}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: enter }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} accessibilityLabel="Close" />
       </Animated.View>
-      <View style={[styles.sheetHolder, { paddingBottom: overlap }]} pointerEvents="box-none">
+      <View style={[styles.sheetHolder, side && styles.sheetHolderSide, { paddingBottom: side ? 0 : overlap }]} pointerEvents="box-none">
         <Animated.View
           style={[
             styles.sheet,
             elevate(t, 3),
+            side && [styles.sheetSide, { width: Math.min(440, Math.round(screenW * 0.48)), marginLeft: insets.left + 8, marginTop: insets.top + 8 }],
             {
               maxHeight,
               backgroundColor: t.bg,
-              paddingBottom: overlap > 0 ? 12 : insets.bottom + 12,
-              transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }],
+              paddingBottom: side || overlap > 0 ? 12 : insets.bottom + 12,
+              transform: side
+                ? [{ translateX: enter.interpolate({ inputRange: [0, 1], outputRange: [-60, 0] }) }]
+                : [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }],
               opacity: enter,
             },
           ]}
         >
-          <View style={[styles.grabber, { backgroundColor: t.border }]} />
+          {side ? null : <View style={[styles.grabber, { backgroundColor: t.border }]} />}
           <View style={styles.sheetHead}>
             <Text style={[styles.sheetTitle, { color: t.text }]} accessibilityRole="header">
               {props.title}
@@ -405,6 +412,7 @@ const styles = StyleSheet.create({
   tileWell: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   tileLabel: { fontSize: 13, fontFamily: font('500'), marginTop: 6 },
   rail: { borderRadius: RADIUS.card, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center' },
+  railRow: { flexDirection: 'row', paddingVertical: 2, paddingHorizontal: 6 },
   toggle: { width: TOUCH + 8, minHeight: TOUCH + 4, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
   toggleWell: { width: 44, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   // A "not" slash from top-left to bottom-right, edged in the well color so it reads over the icon.
@@ -425,6 +433,8 @@ const styles = StyleSheet.create({
   // Pins the sheet to the bottom; bottom padding equal to the keyboard overlap lifts it above.
   sheetHolder: { flex: 1, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: RADIUS.sheet, borderTopRightRadius: RADIUS.sheet, paddingHorizontal: 20, paddingTop: 8 },
+  sheetHolderSide: { justifyContent: 'flex-start', alignItems: 'flex-start' },
+  sheetSide: { borderRadius: RADIUS.sheet, paddingTop: 14 },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: 8 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   sheetTitle: { flex: 1, fontSize: 24, fontFamily: font('700'), letterSpacing: -0.4 },
