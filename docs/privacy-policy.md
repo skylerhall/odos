@@ -48,10 +48,11 @@ the Mapbox logo on the map, then choose the telemetry option. See
 
 ### What stays on your phone
 ODOS saves these only on your device, so they're still there next time you open the app:
-your vehicle and fuel level, your settings (such as night mode, voice, weather effects and avoiding
+your vehicle and fuel level, your shortcuts (such as Home and Work) and recent places, your settings (such as night mode, voice, weather effects and avoiding
 tolls), and offline maps and nearby places saved for your current trip. Uninstalling ODOS, or
 clearing its storage in your phone's settings, deletes all of it. Spoken directions use your phone's
-built-in text-to-speech.
+built-in text-to-speech, and the automatic night map works out sunset and sunrise on your
+phone from your location, without sending it anywhere.
 
 ### Sharing your location with others
 When you tap **Share location** or **Copy coordinates**, ODOS creates a message with your coordinates

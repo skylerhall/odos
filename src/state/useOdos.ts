@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as Speech from 'expo-speech';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Share } from 'react-native';
 import { NAV } from '../config';
 import { burn, fullTank, gaugeLabel, outlook, tankAt, type FuelOutlook, type FuelState } from '../core/fuel';
@@ -31,9 +31,20 @@ import {
 import { cachedRest, saveCorridor, type OfflineStatus } from '../services/offline';
 import { findRest, type RestKind } from '../services/rest';
 import { load, save } from '../services/storage';
-import { duration as fmtDuration, miles as fmtMiles } from '../ui/format';
+import { clockIn, duration as fmtDuration, miles as fmtMiles } from '../ui/format';
+import { isDark, nextLightChange } from '../core/sun';
 
-export type Settings = { voice: boolean; night: boolean; traffic: boolean; avoidTolls: boolean; sim: boolean; simSpeed: number };
+export type Settings = {
+  voice: boolean;
+  /** Dark map and theme. Worked out from sunset/sunrise (see core/sun.ts) unless overridden. */
+  night: boolean;
+  /** Set by tapping Night: holds until the next sunset or sunrise, then it's automatic again. */
+  nightOverride: { night: boolean; until: number } | null;
+  traffic: boolean;
+  avoidTolls: boolean;
+  sim: boolean;
+  simSpeed: number;
+};
 export type Fix = { coord: LngLat; heading: number | null; mph: number; accuracy: number | null; at: number };
 export type Toast = { id: number; text: string; tone: 'info' | 'amber' | 'good' | 'danger' };
 export type LaneView = {
@@ -44,7 +55,15 @@ export type LaneView = {
   simulated: boolean;
 };
 
-const DEFAULT_SETTINGS: Settings = { voice: true, night: false, traffic: true, avoidTolls: false, sim: false, simSpeed: 4 };
+const DEFAULT_SETTINGS: Settings = {
+  voice: true,
+  night: false,
+  nightOverride: null,
+  traffic: true,
+  avoidTolls: false,
+  sim: false,
+  simSpeed: 4,
+};
 /** Where Sim mode starts when there's no GPS fix yet (downtown Denver). */
 const SIM_START: LngLat = [-104.9903, 39.7392];
 
@@ -74,10 +93,21 @@ export function useOdos() {
   /** MPG multiplier from current weather (rain, snow, cold). Set by useWeather. */
   const [efficiency, setEfficiency] = useState(1);
 
+  // ── automatic night mode ──
+  // A one-minute clock, so the map switches at sunset and sunrise even when nothing else changes.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const override = settings.nightOverride;
+  const night = override && clock < override.until ? override.night : isDark(new Date(clock), fix?.coord ?? null);
+  const effectiveSettings = useMemo(() => ({ ...settings, night }), [settings, night]);
+
   // Latest values for callbacks that outlive a render (GPS watcher, timers).
   const live = useRef({ vehicle, fuel, settings, fix, destination, stops, route, progress, efficiency });
   useLayoutEffect(() => {
-    live.current = { vehicle, fuel, settings, fix, destination, stops, route, progress, efficiency };
+    live.current = { vehicle, fuel, settings: effectiveSettings, fix, destination, stops, route, progress, efficiency };
   });
   const tracker = useRef<NavTracker | null>(null);
   const lastFix = useRef<Fix | null>(null);
@@ -555,11 +585,30 @@ export function useOdos() {
     notify(`Copied ${text}`, 'good');
   }, [notify]);
 
-  const toggle = useCallback((key: 'voice' | 'night' | 'traffic' | 'sim') => {
-    tap();
-    setSettings((s) => ({ ...s, [key]: !s[key] }));
-    if (key === 'voice') Speech.stop();
-  }, []);
+  const toggle = useCallback(
+    (key: 'voice' | 'night' | 'traffic' | 'sim') => {
+      tap();
+      if (key === 'night') {
+        // Manual night/day holds until the next sunset or sunrise; flipping back to what the sun
+        // says just returns to automatic.
+        const now = new Date();
+        const where = live.current.fix?.coord ?? null;
+        const want = !live.current.settings.night;
+        if (want === isDark(now, where)) {
+          setSettings((s) => ({ ...s, nightOverride: null }));
+          notify(`${want ? 'Night' : 'Day'} map · automatic`);
+        } else {
+          const until = nextLightChange(now, where).getTime();
+          setSettings((s) => ({ ...s, nightOverride: { night: want, until } }));
+          notify(`${want ? 'Night' : 'Day'} map until ${clockIn((until - now.getTime()) / 1000)}, then automatic`);
+        }
+        return;
+      }
+      setSettings((s) => ({ ...s, [key]: !s[key] }));
+      if (key === 'voice') Speech.stop();
+    },
+    [notify],
+  );
 
   // Takes effect on the current trip right away, rerouting with or without toll roads.
   const toggleTolls = useCallback(() => {
@@ -589,7 +638,7 @@ export function useOdos() {
     vehicle,
     fuel,
     fuelOutlook,
-    settings,
+    settings: effectiveSettings,
     fix,
     permission,
     destination,
