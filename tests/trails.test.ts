@@ -168,5 +168,6 @@ describe('Overpass download', () => {
     expect(q).toContain('(around:8047,39.70000,-105.50000)');
     expect(q).toContain('"highway"~"^(path|');
     expect(q).toContain('node.n["barrier"]');
+    expect(q).toContain('way["highway"="service"]["service"!~"^(driveway|');
   });
 });

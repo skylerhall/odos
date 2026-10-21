@@ -45,15 +45,20 @@ export type TrailPoi = { name: string; kind: string; coord: LngLat };
 
 // ── download ──
 
-// Trails, tracks and the back roads that join them. Town streets, alleys and driveways (residential,
-// service, living_street) are left out: in a big area near a town they'd be most of the download.
+// Trails, tracks and the back roads that join them. Town streets (residential, living_street) are
+// left out: in a big area near a town they'd be most of the download. Service roads stay (park roads
+// and trailhead lots connect trails to where you start), except driveways, alleys and lot aisles.
 const HIGHWAYS = 'path|footway|track|bridleway|cycleway|steps|pedestrian|unclassified|tertiary';
+const SKIP_SERVICE = 'driveway|parking_aisle|drive-through|alley|emergency_access';
 
 /** Overpass QL for everything Trail Mode needs inside a circle. */
 export function trailQuery(center: LngLat, radiusM: number): string {
   const a = `(around:${Math.round(radiusM)},${center[1].toFixed(5)},${center[0].toFixed(5)})`;
   return `[out:json][timeout:180];
-way["highway"~"^(${HIGHWAYS})$"]${a}->.w;
+(
+  way["highway"~"^(${HIGHWAYS})$"]${a};
+  way["highway"="service"]["service"!~"^(${SKIP_SERVICE})$"]${a};
+)->.w;
 .w out body qt;
 node(w.w)->.n;
 .n out skel qt;
