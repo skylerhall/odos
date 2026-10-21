@@ -21,7 +21,7 @@ export function Speedometer({ mph, limit }: { mph: number; limit: number | null 
       accessibilityRole="text"
       accessibilityLabel={`Speed ${speed} miles per hour${limit != null ? `, limit ${limit}${over ? ', over the limit' : ''}` : ''}`}
     >
-      <View style={[styles.dial, { backgroundColor: over ? t.danger : t.bg, borderColor: over ? t.danger : t.border }, elevate(t, 2)]}>
+      <View style={[styles.dial, { backgroundColor: over ? t.danger : t.bg, borderColor: over ? t.danger : t.brand }, elevate(t, 2)]}>
         <Text style={[styles.speed, { color: over ? t.onAccent : t.text }]}>{speed}</Text>
         <Text style={[styles.unit, { color: over ? t.onAccent : t.muted }]}>mph</Text>
       </View>

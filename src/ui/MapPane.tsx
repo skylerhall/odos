@@ -7,6 +7,7 @@ import type { Stop } from '../core/places';
 import type { Condition } from '../core/weather';
 import { congestionRuns, type Route } from '../core/route';
 import type { Fix } from '../state/useOdos';
+import { useTheme } from './controls';
 import { CONGESTION_COLORS } from './theme';
 import { WeatherMapLayers } from './WeatherOverlay';
 
@@ -32,6 +33,7 @@ export function MapPane(props: {
   weather: Condition | null;
   weatherFx: boolean;
 }) {
+  const t = useTheme();
   const routeShape = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (!props.route) return null;
     return {
@@ -91,7 +93,7 @@ export function MapPane(props: {
       />
       {props.sim && props.fix ? <Mapbox.CustomLocationProvider coordinate={props.fix.coord} heading={props.fix.heading ?? 0} /> : null}
       <WeatherMapLayers cond={props.weather} enabled={props.weatherFx} night={props.night} />
-      <Mapbox.LocationPuck puckBearingEnabled puckBearing="course" pulsing={{ isEnabled: true }} />
+      <Mapbox.LocationPuck puckBearingEnabled puckBearing="course" pulsing={{ isEnabled: true, color: t.brand }} />
 
       {props.traffic ? (
         <Mapbox.VectorSource id="traffic" url={STYLE.trafficTiles}>

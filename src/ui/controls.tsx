@@ -189,10 +189,10 @@ export function RoundToggle(props: { icon: IconName; label: string; on: boolean;
       scaleTo={0.9}
       style={styles.toggle}
     >
-      <View style={[styles.toggleWell, { backgroundColor: props.on ? t.accentSoft : 'transparent' }]}>
-        <Icon name={props.icon} size={24} color={props.on ? t.accent : t.muted} />
+      <View style={[styles.toggleWell, { backgroundColor: props.on ? t.brandSoft : 'transparent' }]}>
+        <Icon name={props.icon} size={24} color={props.on ? t.brandText : t.muted} />
       </View>
-      <Text style={[styles.toggleLabel, { color: props.on ? t.accent : t.muted }]}>{props.label}</Text>
+      <Text style={[styles.toggleLabel, { color: props.on ? t.brandText : t.muted }]}>{props.label}</Text>
     </PressScale>
   );
 }

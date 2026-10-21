@@ -30,7 +30,7 @@ export function PanelHandle({ minimized, onChange }: { minimized: boolean; onCha
         accessibilityHint={minimized ? 'Shows the full panel' : 'Shrinks the panel so you can see more map'}
         style={({ pressed }) => [styles.btn, { opacity: pressed ? 0.6 : 1 }]}
       >
-        <View style={[styles.bar, { backgroundColor: t.border }]} />
+        <View style={[styles.bar, { backgroundColor: t.brand, opacity: 0.55 }]} />
         <Text style={[styles.label, { color: t.muted }]}>{minimized ? '▲ Show menu' : '▼ Minimize'}</Text>
       </Pressable>
     </View>

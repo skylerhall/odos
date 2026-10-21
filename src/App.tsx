@@ -190,7 +190,7 @@ function Main() {
               scaleTo={0.98}
               style={[styles.searchPill, { backgroundColor: theme.bg }, elevate(theme, 2)]}
             >
-              <Icon name="magnify" size={26} color={theme.accent} />
+              <Icon name="magnify" size={26} color={theme.brand} />
               <Text style={[styles.searchText, { color: theme.muted }]}>{odos.routing ? 'Finding route…' : 'Where to?'}</Text>
             </PressScale>
           )}
@@ -268,7 +268,7 @@ function Main() {
                   </Text>
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="magnify" size={22} color={theme.accent} />
+                    <Icon name="magnify" size={22} color={theme.brand} />
                     <Text style={[styles.miniMeta, { color: theme.muted, marginLeft: 8 }]}>Where to?</Text>
                   </View>
                 )}
@@ -462,7 +462,7 @@ function TripBar(props: { onSearch: () => void; original: { name: string } | nul
         scaleTo={0.98}
         style={[styles.tripSearch, { backgroundColor: t.bg }, elevate(t, 2)]}
       >
-        <Icon name="magnify" size={22} color={t.accent} />
+        <Icon name="magnify" size={22} color={t.brand} />
         <Text style={[styles.tripSearchText, { color: t.muted }]} numberOfLines={1}>
           Add a stop or reroute
         </Text>

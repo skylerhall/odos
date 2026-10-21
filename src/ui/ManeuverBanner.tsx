@@ -12,7 +12,7 @@ export function ManeuverBanner({ progress, lanes, rerouting }: { progress: Progr
   if (!progress) {
     return (
       <View style={[styles.banner, { backgroundColor: t.banner }, elevate(t, 2)]}>
-        <Icon name="navigation-variant" size={28} color={t.accent} />
+        <Icon name="navigation-variant" size={28} color={t.brand} />
         <Text style={[styles.instruction, { color: t.onBanner, marginLeft: 12 }]}>
           {rerouting ? 'Finding the best route…' : 'Starting route…'}
         </Text>
@@ -30,7 +30,7 @@ export function ManeuverBanner({ progress, lanes, rerouting }: { progress: Progr
         accessibilityRole="header"
         accessibilityLabel={say}
       >
-        <View style={[styles.glyphWell, { backgroundColor: t.accent }]}>
+        <View style={[styles.glyphWell, { backgroundColor: t.brand }]}>
           <Icon name={maneuverGlyph(m.type, m.modifier)} size={40} color={t.onAccent} />
         </View>
         <View style={{ flex: 1, marginLeft: 14 }}>

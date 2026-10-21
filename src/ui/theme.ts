@@ -1,5 +1,6 @@
-// Design tokens. One accent (a calm blue), one cool-gray family, semantic amber/red/green used
-// only for meaning (fuel, danger, arrival). High contrast and big targets: ODOS is read at a
+// Design tokens. A calm blue for actions, ODOS orange (from the icon) for the brand touches:
+// the turn arrow, your position, active toggles, the speedometer. One cool-gray family; semantic
+// amber/red/green used only for meaning (fuel, danger, arrival). High contrast and big targets: ODOS is read at a
 // glance, often one-handed, sometimes in gloves.
 
 import type { TextStyle, ViewStyle } from 'react-native';
@@ -17,6 +18,11 @@ export const DAY = {
   accent: '#2F6BDB',
   accentSoft: '#E6EEFC',
   onAccent: '#FFFFFF',
+  /** ODOS orange: icons, fills and large type. */
+  brand: '#F45A0C',
+  /** Deeper orange for small text on light backgrounds (4.5:1 on white). */
+  brandText: '#C24705',
+  brandSoft: '#FFE9DC',
   amber: '#E39B12',
   amberSoft: '#FCF0D7',
   onAmber: '#241800',
@@ -40,6 +46,9 @@ export const NIGHT: Theme = {
   accent: '#77A2F4',
   accentSoft: '#1F2C45',
   onAccent: '#0B1422',
+  brand: '#FF7A2E',
+  brandText: '#FF8F4D',
+  brandSoft: '#3B2112',
   amber: '#F2B33D',
   amberSoft: '#3A2E14',
   onAmber: '#1E1500',
