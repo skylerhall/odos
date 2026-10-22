@@ -87,6 +87,15 @@ function Main() {
     setMinimizedState(min);
     save('panelMinimized', min);
   }, []);
+  // The side toggles can be tucked away into a small tab; remembered like the panel.
+  const [railHidden, setRailHiddenState] = useState(false);
+  useEffect(() => {
+    load<boolean>('railHidden', false).then(setRailHiddenState);
+  }, []);
+  const setRailHidden = useCallback((hidden: boolean) => {
+    setRailHiddenState(hidden);
+    save('railHidden', hidden);
+  }, []);
   // Measured height of the bottom panel: the re-center button and the driving camera sit above it.
   const [panelH, setPanelH] = useState(260);
   const wx = useWeather({
@@ -123,6 +132,10 @@ function Main() {
   const landscape = screenW > screenH;
   const sideW = Math.min(400, Math.round(screenW * 0.42));
   const mapInset = landscape ? { left: insets.left + 12 + sideW + 12, bottom: insets.bottom + 8 } : { left: 0, bottom: panelH + 24 };
+  // The camera centers your position between this top padding and the panel, so a top padding of
+  // (visible height - 2 × gap) puts you `gap` points above the panel, the way Google Maps does.
+  const puckGap = landscape ? 70 : 120;
+  const drivePadTop = Math.max(0, screenH - mapInset.bottom - 2 * puckGap);
   // After picking a vehicle, ask how full the tank is instead of assuming full.
   const pickedVehicle = useRef(false);
 
@@ -146,7 +159,7 @@ function Main() {
     <>
       {trip ? (
         <>
-          <ManeuverBanner progress={p} lanes={odos.lanes} rerouting={odos.routing} />
+          <ManeuverBanner progress={p} rerouting={odos.routing} />
           <TripBar
             onSearch={() => {
               setQuickChange(true);
@@ -226,30 +239,48 @@ function Main() {
       ) : null}
     </>
   );
-  // The one-tap toggles.
-  const rail = (
-    <>
-      {minimized ? null : (
-        <Rail horizontal={landscape}>
-          <RoundToggle
-            icon={settings.voice ? 'volume-high' : 'volume-off'}
-            label="Voice"
-            on={settings.voice}
-            onPress={() => a.toggle('voice')}
-          />
-          <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
-          <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
-          <RoundToggle
-            icon="boom-gate"
-            label={settings.avoidTolls ? 'No tolls' : 'Tolls'}
-            a11yLabel="Avoid tolls"
-            slash={settings.avoidTolls}
-            on={settings.avoidTolls}
-            onPress={a.toggleTolls}
-          />
-        </Rail>
-      )}
-    </>
+  // The one-tap toggles. Shown whether the panel is minimized or not; Hide tucks them into a tab.
+  const rail = railHidden ? (
+    <PressScale
+      accessibilityRole="button"
+      accessibilityLabel="Show map toggles"
+      accessibilityHint="Voice, night, traffic and tolls"
+      onPress={() => setRailHidden(false)}
+      scaleTo={0.92}
+      style={[styles.railTab, { backgroundColor: theme.bg }, elevate(theme, 2)]}
+    >
+      <Icon name="chevron-left" size={20} color={theme.muted} />
+      <Icon name="tune-variant" size={22} color={theme.brand} />
+    </PressScale>
+  ) : (
+    <Rail horizontal={landscape}>
+      <RoundToggle
+        icon={settings.voice ? 'volume-high' : 'volume-off'}
+        label="Voice"
+        on={settings.voice}
+        onPress={() => a.toggle('voice')}
+      />
+      <RoundToggle icon="weather-night" label="Night" on={settings.night} onPress={() => a.toggle('night')} />
+      <RoundToggle icon="traffic-light" label="Traffic" on={settings.traffic} onPress={() => a.toggle('traffic')} />
+      <RoundToggle
+        icon="boom-gate"
+        label={settings.avoidTolls ? 'No tolls' : 'Tolls'}
+        a11yLabel="Avoid tolls"
+        slash={settings.avoidTolls}
+        on={settings.avoidTolls}
+        onPress={a.toggleTolls}
+      />
+      <PressScale
+        accessibilityRole="button"
+        accessibilityLabel="Hide map toggles"
+        onPress={() => setRailHidden(true)}
+        scaleTo={0.9}
+        style={styles.railHide}
+      >
+        <Icon name="chevron-right" size={22} color={theme.muted} />
+        <Text style={[styles.railHideText, { color: theme.muted }]}>Hide</Text>
+      </PressScale>
+    </Rail>
   );
   // Trip, fuel and the action tiles.
   const panel = (
@@ -375,8 +406,8 @@ function Main() {
             }}
             onUserPan={() => setFollow(false)}
             inset={mapInset}
-            // While driving, keep your position low in the visible map so more road shows ahead.
-            topPadding={landscape ? Math.round(screenH * 0.35) : 0}
+            // While driving, keep your position low on screen (just above the panel) so the road ahead fills it.
+            topPadding={drivePadTop}
             weather={wx.shown}
             weatherFx={wx.fxOn}
             trail={trail.active ? { lines: trail.lines, track: trail.track.coords } : null}
@@ -662,6 +693,10 @@ const styles = StyleSheet.create({
   pinText: { flex: 1, fontSize: 15, fontFamily: font('500'), marginLeft: 8, ...NUMERIC },
   pinBtn: { minWidth: 64, marginLeft: 6, paddingHorizontal: 12 },
   rail: { position: 'absolute', right: 12 },
+  railHide: { width: 64, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  railHideText: { fontSize: 11, fontFamily: font('600') },
+  // Collapsed toggles: a small tab against the right edge, big enough to hit.
+  railTab: { flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingHorizontal: 10, borderRadius: RADIUS.control },
   speedo: { position: 'absolute' },
   side: { position: 'absolute' },
   // Takes the rest of the column below the banner; scrolls when the screen is short.
