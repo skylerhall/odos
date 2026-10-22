@@ -7,6 +7,7 @@ import type { Stop } from '../core/places';
 import type { Condition } from '../core/weather';
 import { congestionRuns, type Route } from '../core/route';
 import type { Fix } from '../state/useOdos';
+import type { BodyStyle } from '../core/vehicles/body';
 import { useTheme } from './controls';
 import { CONGESTION_COLORS } from './theme';
 import { WeatherMapLayers } from './WeatherOverlay';
@@ -14,6 +15,14 @@ import { WeatherMapLayers } from './WeatherOverlay';
 if (MAPBOX_TOKEN) Mapbox.setAccessToken(MAPBOX_TOKEN);
 
 const STOP_ICONS: Record<string, string> = { gas: '⛽', hotel: '🏨', camp: '🏕', freepark: '🅿', custom: '📍', destination: '🏁' };
+
+/** Top-down markers drawn by scripts/make-puck-icons.py. */
+const PUCK_IMAGES = {
+  'puck-car': require('../../assets/puck/car.png'),
+  'puck-truck': require('../../assets/puck/truck.png'),
+  'puck-van': require('../../assets/puck/van.png'),
+  'puck-none': require('../../assets/puck/none.png'),
+};
 
 export function MapPane(props: {
   night: boolean;
@@ -34,6 +43,8 @@ export function MapPane(props: {
   /** Rain/snow drawn inside the map scene. */
   weather: Condition | null;
   weatherFx: boolean;
+  /** Your position marker: a top-down car, pickup or van that turns with your heading, or the dot (on foot). */
+  puck: BodyStyle | 'dot';
   /** Trail Mode: the downloaded trail network and your breadcrumb track. */
   trail?: { lines: GeoJSON.FeatureCollection | null; track: LngLat[] } | null;
 }) {
@@ -103,7 +114,21 @@ export function MapPane(props: {
       />
       {props.sim && props.fix ? <Mapbox.CustomLocationProvider coordinate={props.fix.coord} heading={props.fix.heading ?? 0} /> : null}
       <WeatherMapLayers cond={props.weather} enabled={props.weatherFx} night={props.night} />
-      <Mapbox.LocationPuck puckBearingEnabled puckBearing="course" pulsing={{ isEnabled: true, color: t.brand }} />
+      <Mapbox.Images images={PUCK_IMAGES} />
+      {props.puck === 'dot' ? (
+        <Mapbox.LocationPuck puckBearingEnabled puckBearing="course" pulsing={{ isEnabled: true, color: t.brand }} />
+      ) : (
+        <Mapbox.LocationPuck
+          puckBearingEnabled
+          puckBearing="course"
+          // The vehicle is the bearing image so it rotates with your heading; the default blue dot
+          // drawn on top is replaced by a transparent image.
+          bearingImage={`puck-${props.puck}`}
+          topImage="puck-none"
+          shadowImage="puck-none"
+          scale={['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 0.9, 18, 1.1]}
+        />
+      )}
 
       {props.traffic ? (
         <Mapbox.VectorSource id="traffic" url={STYLE.trafficTiles}>

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tankEighths } from './core/fuel';
+import { bodyStyle } from './core/vehicles/body';
 import { MI } from './core/geo';
 import { speedLimitAt } from './core/route';
 import { formatCoords } from './core/share';
@@ -411,6 +412,7 @@ function Main() {
             weather={wx.shown}
             weatherFx={wx.fxOn}
             trail={trail.active ? { lines: trail.lines, track: trail.track.coords } : null}
+            puck={trail.active && trail.mode === 'hike' ? 'dot' : bodyStyle(odos.vehicle)}
           />
         ) : (
           <View style={[styles.center, { backgroundColor: theme.panel, padding: 24 }]}>
