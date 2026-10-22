@@ -128,3 +128,94 @@ export function congestionRuns(route: Route): { level: Congestion; coords: LngLa
   }
   return runs;
 }
+
+// ── Long trips ──
+// Mapbox turns down a single directions request past its distance limit ("Route exceeds maximum
+// distance limitation"). Long trips are routed in pieces (each leg on its own, and a leg that is
+// still too long split at a town along the way) and the pieces joined back into one route.
+
+type ApiLeg = ApiRoute['legs'][number];
+type Annotation = { congestion: string[]; maxspeed: ApiMaxSpeed[] };
+
+const ARRIVING = /arriv|destination/i;
+
+/** A one-leg route's annotations, padded so there is exactly one entry per line segment. */
+function annotationOf(r: ApiRoute): Annotation {
+  const segs = Math.max(0, r.geometry.coordinates.length - 1);
+  const a = r.legs[0]?.annotation;
+  return {
+    congestion: a?.congestion?.length === segs ? [...a.congestion] : Array(segs).fill('unknown'),
+    maxspeed: a?.maxspeed?.length === segs ? [...a.maxspeed] : Array(segs).fill({ unknown: true }),
+  };
+}
+
+/** Geometry of b after a, without repeating the shared point; `gap` when they don't meet. */
+function appendCoords(a: LngLat[], b: LngLat[]): { coords: LngLat[]; gap: boolean } {
+  const last = a.at(-1);
+  const first = b[0];
+  const same = !!last && !!first && Math.abs(last[0] - first[0]) < 1e-5 && Math.abs(last[1] - first[1]) < 1e-5;
+  return { coords: [...a, ...(same ? b.slice(1) : b)], gap: !same && !!last && !!first };
+}
+
+/**
+ * Two pieces of one leg (a ends where b starts) as a single leg: the arrival at the split point and
+ * its "you will arrive" prompts are dropped, and b's "Head north on…" becomes a plain continue.
+ */
+export function joinPieces(a: ApiRoute, b: ApiRoute): ApiRoute {
+  const stepsA = [...(a.legs[0]?.steps ?? [])];
+  if (stepsA.at(-1)?.maneuver.type === 'arrive') stepsA.pop();
+  const tail = stepsA.at(-1);
+  if (tail) stepsA[stepsA.length - 1] = { ...tail, voiceInstructions: tail.voiceInstructions?.filter((v) => !ARRIVING.test(v.announcement)) };
+  const stepsB = (b.legs[0]?.steps ?? []).map((s, i) =>
+    i === 0 && s.maneuver.type === 'depart'
+      ? {
+          ...s,
+          maneuver: { ...s.maneuver, type: 'continue', modifier: 'straight', instruction: s.name ? `Continue on ${s.name}` : 'Continue' },
+          // Drop the "Head north on…" said as the piece starts; keep the prompts further along.
+          voiceInstructions: s.voiceInstructions?.filter((v) => v.distanceAlongGeometry < s.distance - 1),
+        }
+      : s,
+  );
+  const { coords, gap } = appendCoords(a.geometry.coordinates, b.geometry.coordinates);
+  const annA = annotationOf(a);
+  const annB = annotationOf(b);
+  const pad = gap ? 1 : 0;
+  return {
+    distance: a.distance + b.distance,
+    duration: a.duration + b.duration,
+    geometry: { coordinates: coords },
+    legs: [
+      {
+        distance: a.distance + b.distance,
+        steps: [...stepsA, ...stepsB],
+        annotation: {
+          congestion: [...annA.congestion, ...Array(pad).fill('unknown'), ...annB.congestion],
+          maxspeed: [...annA.maxspeed, ...Array(pad).fill({ unknown: true }), ...annB.maxspeed],
+        },
+      },
+    ],
+  };
+}
+
+/** One-leg routes for consecutive legs of a trip (stop to stop) as one multi-leg route. */
+export function joinLegs(parts: ApiRoute[]): ApiRoute {
+  let coords: LngLat[] = [];
+  const legs: ApiLeg[] = [];
+  for (const p of parts) {
+    const joined = appendCoords(coords, p.geometry.coordinates);
+    // A gap between legs is a segment of its own; count it on the leg before.
+    const prev = legs.at(-1);
+    if (joined.gap && prev?.annotation) {
+      prev.annotation.congestion?.push('unknown');
+      prev.annotation.maxspeed?.push({ unknown: true });
+    }
+    coords = joined.coords;
+    legs.push({ distance: p.legs[0]?.distance ?? p.distance, steps: p.legs[0]?.steps ?? [], annotation: annotationOf(p) });
+  }
+  return {
+    distance: parts.reduce((s, p) => s + p.distance, 0),
+    duration: parts.reduce((s, p) => s + p.duration, 0),
+    geometry: { coordinates: coords },
+    legs,
+  };
+}

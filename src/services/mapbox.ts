@@ -1,9 +1,9 @@
 // Mapbox web APIs: routing with live traffic, place search, category search, drive-time matrix.
 
 import { MAPBOX_TOKEN } from '../config';
-import type { BBox, LngLat } from '../core/geo';
+import { bearing, destinationPoint, haversine, type BBox, type LngLat } from '../core/geo';
 import type { Place, PlaceKind } from '../core/places';
-import { parseRoute, type ApiRoute, type Route } from '../core/route';
+import { joinLegs, joinPieces, parseRoute, type ApiRoute, type Route } from '../core/route';
 import { fetchJson, HttpError, qs } from './http';
 
 const API = 'https://api.mapbox.com';
@@ -25,15 +25,71 @@ function isRejection(e: unknown): boolean {
  * asks for lane data, voice prompts and per-segment congestion. Falls back to the plain driving
  * profile if the traffic profile rejects the request (e.g. too many stops). With avoidTolls, asks
  * for toll-free routes; if none exists, returns the normal routes (check Route.tolls).
+ *
+ * Trips past Mapbox's distance limit for one request are routed leg by leg, and a leg that is still
+ * too long is split at a town halfway along (see routeLongLeg); the pieces come back as one route.
  */
-export async function getRoutes(
-  points: LngLat[],
-  opts: { limits?: VehicleLimits; heading?: number; avoidTolls?: boolean } = {},
-): Promise<Route[]> {
+export async function getRoutes(points: LngLat[], opts: RouteOpts = {}): Promise<Route[]> {
+  try {
+    return (await directions(points, opts, points.length === 2)).map(parseRoute);
+  } catch (e) {
+    if (!isTooFar(e)) throw e;
+  }
+  const legs = await Promise.all(
+    points.slice(1).map((to, i) => routeLongLeg(points[i], to, i === 0 ? opts : { ...opts, heading: undefined }, 0)),
+  );
+  return [parseRoute(legs.length === 1 ? legs[0] : joinLegs(legs))];
+}
+
+/** Halving a leg this many times allows trips 16× the per-request limit. */
+const MAX_SPLITS = 4;
+
+async function routeLongLeg(from: LngLat, to: LngLat, opts: RouteOpts, depth: number): Promise<ApiRoute> {
+  try {
+    return (await directions([from, to], opts, false))[0];
+  } catch (e) {
+    if (!isTooFar(e) || depth >= MAX_SPLITS) throw e;
+  }
+  const via = await townNear(greatCircleMid(from, to));
+  const [a, b] = await Promise.all([
+    routeLongLeg(from, via, opts, depth + 1),
+    routeLongLeg(via, to, { ...opts, heading: undefined }, depth + 1),
+  ]);
+  return joinPieces(a, b);
+}
+
+/** Mapbox's answer for a request longer than it routes in one go. */
+function isTooFar(e: unknown): boolean {
+  return e instanceof Error && /maximum distance/i.test(e.message);
+}
+
+function greatCircleMid(a: LngLat, b: LngLat): LngLat {
+  return destinationPoint(a, haversine(a, b) / 2, bearing(a, b));
+}
+
+/**
+ * The center of the town nearest a point, so a split lands on a through road rather than wherever
+ * the halfway point happens to be (a field, a forest road). The point itself if the lookup fails.
+ */
+async function townNear(p: LngLat): Promise<LngLat> {
+  try {
+    const data = await fetchJson<{ features: Feature[] }>(
+      `${API}/search/geocode/v6/reverse?${qs({ longitude: p[0].toFixed(5), latitude: p[1].toFixed(5), types: 'place,locality', limit: 1, access_token: MAPBOX_TOKEN })}`,
+    );
+    return data.features?.[0]?.geometry.coordinates ?? p;
+  } catch {
+    return p;
+  }
+}
+
+type RouteOpts = { limits?: VehicleLimits; heading?: number; avoidTolls?: boolean };
+
+/** One Directions request with the traffic → plain driving and toll-free → tolls fallbacks. */
+async function directions(points: LngLat[], opts: RouteOpts, alternatives: boolean): Promise<ApiRoute[]> {
   const path = points.map((p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join(';');
   const params = {
     access_token: MAPBOX_TOKEN,
-    alternatives: points.length === 2,
+    alternatives,
     geometries: 'geojson',
     overview: 'full',
     steps: true,
@@ -51,9 +107,11 @@ export async function getRoutes(
   const call = async (profile: string) => {
     const data = await fetchJson<{ code: string; message?: string; routes: ApiRoute[] }>(
       `${API}/directions/v5/mapbox/${profile}/${path}?${qs(params)}`,
+      // Long routes with full detail are large downloads.
+      { timeoutMs: 30000 },
     );
     if (data.code !== 'Ok' || !data.routes?.length) throw new Error(data.message ?? data.code ?? 'No route');
-    return data.routes.map(parseRoute);
+    return data.routes;
   };
   const request = async () => {
     try {
@@ -69,7 +127,7 @@ export async function getRoutes(
   try {
     return await request();
   } catch (e) {
-    if (!params.exclude || !isRejection(e)) throw e;
+    if (!params.exclude || !isRejection(e) || isTooFar(e)) throw e;
     // No toll-free way through these points: take the normal route and let the caller say so.
     params.exclude = undefined;
     params.annotations = 'congestion,duration,distance,maxspeed';
