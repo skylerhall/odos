@@ -201,7 +201,10 @@ export function RoundToggle(props: {
       scaleTo={0.9}
       style={styles.toggle}
     >
-      <View style={[styles.toggleWell, { backgroundColor: props.on ? t.brandSoft : 'transparent' }]}>
+      <View style={styles.toggleWell}>
+        {/* The pill is always drawn and only fades: swapping a rounded view's background between
+            transparent and a color makes Android drop the rounding, leaving square corners. */}
+        <View style={[styles.togglePill, { backgroundColor: t.brandSoft, opacity: props.on ? 1 : 0 }]} />
         <Icon name={props.icon} size={24} color={color} />
         {props.slash ? <View style={[styles.slash, { backgroundColor: color, borderColor: wellBg }]} /> : null}
       </View>
@@ -414,7 +417,8 @@ const styles = StyleSheet.create({
   rail: { borderRadius: RADIUS.card, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center' },
   railRow: { flexDirection: 'row', paddingVertical: 2, paddingHorizontal: 6 },
   toggle: { width: TOUCH + 8, minHeight: TOUCH + 4, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
-  toggleWell: { width: 44, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  toggleWell: { width: 44, height: 36, alignItems: 'center', justifyContent: 'center' },
+  togglePill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 18 },
   // A "not" slash from top-left to bottom-right, edged in the well color so it reads over the icon.
   slash: { position: 'absolute', width: 32, height: 5, borderRadius: 2.5, borderWidth: 1.5, transform: [{ rotate: '45deg' }] },
   toggleLabel: { fontSize: 11, fontFamily: font('600'), marginTop: 2, letterSpacing: 0.2 },
