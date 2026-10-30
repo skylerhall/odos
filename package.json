@@ -1,6 +1,11 @@
 {
   "name": "odos",
   "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skylerhall/odos.git"
+  },
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/geist": "^0.4.2",

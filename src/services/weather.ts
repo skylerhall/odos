@@ -1,6 +1,7 @@
 // Weather data: Open-Meteo (free, no key, worldwide) for current conditions and the forecast along
 // the route, and the US National Weather Service for official alerts (winter storm, flood, etc.).
 
+import { APP_CONTACT } from '../config';
 import type { LngLat } from '../core/geo';
 import { fromWmo, nearestHour, type AheadReport, type Condition, type RouteSample } from '../core/weather';
 import { fetchJson, qs } from './http';
@@ -66,7 +67,7 @@ export type WeatherAlert = { id: string; event: string; headline: string; severi
 export async function nwsAlerts([lon, lat]: LngLat): Promise<WeatherAlert[]> {
   type R = { features?: { id: string; properties: { event: string; headline?: string; severity: string } }[] };
   const data = await fetchJson<R>(`https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`, {
-    headers: { Accept: 'application/geo+json', 'User-Agent': 'ODOS navigation app (github.com/skylerhall/odos)' },
+    headers: { Accept: 'application/geo+json', 'User-Agent': `${APP_CONTACT.name} navigation app (${APP_CONTACT.url})` },
     timeoutMs: 8000,
   });
   return (data.features ?? [])

@@ -2,32 +2,46 @@
 
 *ὁδός (odós): Greek for "road" or "way."*
 
-A GPS app for road trips. It does turn-by-turn directions with live traffic, and it also handles the
-things Google Maps and Waze leave to you: when to get gas, where to stop, which lane to be in, and
-how to send someone your location.
+A road-trip GPS app for Android, built with Expo and Mapbox. It gives turn-by-turn directions with
+live traffic, and it also handles the things other map apps leave to you: when to get gas, where to
+stop for the night, and how to get around on trails with no signal.
 
-## What it does
+ODOS is open source under the [MIT License](LICENSE). Fork it, learn from it, build on it.
+
+## Features
 
 | Feature | How it works |
 |---|---|
-| **Vehicle match** | Type "dodge" and you get every Dodge in the built-in list (about 390 vehicles, current and older generations, works offline). Add the year, like "2007 tundra 4.7", and the same search also pulls exact matches from the official EPA list of every US vehicle since 1984. You can also decode a VIN through NHTSA, or type in your own numbers. |
-| **Fuel tracking** | Fuel burns as you drive, at your vehicle's EPA MPG, adjusted for speed (efficiency drops above 55 mph). Range is estimated at the pace you'll actually drive on this route, and the app shows how much range you'll have left when you arrive. |
-| **50-mile buffer** | When range drops to 50 miles, ODOS alerts you, searches for gas **15–30 miles ahead on your route**, and adds the best station as a stop automatically. |
-| **One-tap fill-up** | Tap "I just filled up" and the tank resets to full, the auto gas stop is cleared, and ODOS tells you how many miles until the next fuel alert. |
-| **Rest finder (≤ 2 hrs)** | Shows hotels, campgrounds (including federal ones) and free overnight parking (rest areas, truck stops, Walmart lots, free campsites) within a 2-hour drive. You choose the starting point: you, the next stop, the destination, or any pin you drop by long-pressing the map. Tap **+ Add** and it becomes the next stop. |
-| **Turn-by-turn** | Mapbox routing with live traffic, a route line colored by congestion, voice prompts, automatic rerouting, and lane arrows for the next turn. |
-| **Lane advice** | Each lane is scored as **70% live speed + 30% historical "human-flow" speed**. When that 30% changes which lane wins (the "slow lane is actually faster" case), it's labeled *human-flow flip*. Suggestions only change after a lane has been best for 8 seconds and is at least 3 mph faster, so they don't flicker. |
-| **Offline** | When a trip starts, ODOS saves map tiles along the whole route (20 miles each side at low zoom, 2 miles each side at street level). It also saves gas stations, hotels and campgrounds along the corridor, so the fuel alert, gas picker and rest finder keep working without signal. |
-| **Weather** | A badge next to the map shows the conditions and temperature, and turns amber for hazards. The map shows the weather too: Mapbox-rendered rain and snow that tilt with the 3D view, plus a sun glow, drifting clouds, fog banks, and lightning flashes in storms. ODOS checks the forecast **along your route for the hour you'll reach each point**, warns you once about hazards ahead ("Heavy snow on your route in about 40 miles"), reads official National Weather Service alerts, and lowers the range estimate for rain, snow and cold (much more for EVs). Effects can be turned off, pause when the phone's Reduce Motion setting is on, and can be previewed from the weather sheet. |
-| **Share / copy** | One tap opens the share sheet with your coordinates and a map link that works on any phone. Another tap copies `lat, lon` to the clipboard. |
-| **Accessibility** | One-tap toggles for voice, night mode, traffic and Sim. Every button is at least 56 px, high-contrast and labeled for screen readers. |
-| **Sim mode** | Drives your route at 1×, 4×, 16× or 60× speed so you can watch the fuel alert, auto gas stop and lane logic happen without leaving the couch. |
+| **Turn-by-turn** | Mapbox routing with live traffic, a route line colored by congestion, voice prompts and automatic rerouting. Long trips past Mapbox's per-request distance limit are routed in pieces and joined into one route. |
+| **Trip controls** | Search from the top bar to add a stop or reroute mid-trip, go back to the original trip, or end navigation. Long-press anywhere on the map to drop a pin and go there. |
+| **Avoid tolls** | One toggle. If no toll-free route exists, ODOS says so and uses the toll route. |
+| **Speed** | A small capsule shows your speed with the posted limit beside it, and turns red when you're more than 5 mph over. |
+| **Vehicle match** | Type "dodge" and you get every Dodge in the built-in list (about 390 vehicles, works offline). Add the year, like "2007 tundra 4.7", and the same search also pulls exact matches from the EPA list of every US vehicle since 1984. You can also decode a VIN through NHTSA or enter your own numbers. Your position marker is a car, pickup or van to match. |
+| **Fuel tracking** | Set your starting fuel level in eighths. Fuel burns as you drive at your vehicle's EPA MPG, adjusted for speed. Range is estimated at the pace you'll drive on this route. |
+| **50-mile buffer** | When range drops to 50 miles, ODOS alerts you, searches for gas **15–30 miles ahead on your route**, and adds the best station as a stop. "Nearest gas station" in search lists what's close. |
+| **Rest finder (≤ 2 hrs)** | Hotels, campgrounds (including federal ones) and free overnight parking (rest areas, truck stops, free campsites) within a 2-hour drive of you, your next stop, your destination or a dropped pin. |
+| **Trail Mode** | Download trails around a point ahead of time, then navigate them with no signal: on foot or off-road (vehicles stay off footpaths and are warned about gates). Includes a topo map, a breadcrumb track with a route back, dead-end warnings, and a compass arrow when you're off the trail network. |
+| **Offline** | When a trip starts, ODOS saves map tiles along the route plus gas stations, hotels and campgrounds along the corridor, so the fuel alert and pickers keep working without signal. |
+| **Weather** | Current conditions, the forecast along your route for the hour you'll reach each point, National Weather Service alerts, and rain, snow and fog drawn on the map. Bad weather lowers the range estimate. |
+| **Saved places** | Recent places, plus shortcuts like Home and Work. |
+| **Day and night** | Switches to the dark map at sunset and back at sunrise for where you are, or by hand. Portrait and landscape layouts. |
+| **Share / copy** | Share your coordinates with a map link that works on any phone, or copy `lat, lon`. |
+| **Accessibility** | Every button is at least 56 px, high-contrast and labeled for screen readers. |
+| **Sim mode** | Drives your route at 1×, 4×, 16× or 60× so you can watch the fuel alert and auto gas stop without leaving the couch. |
 
-## Setup (one time)
+## Try it
 
-1. **Get a Mapbox token.** Create a free account at mapbox.com, open
-   [Access tokens](https://account.mapbox.com/access-tokens), and copy the **Default public token**
-   (it starts with `pk.`). The secret download token older guides mention isn't required anymore.
+The latest Android build is always at
+[Releases → ODOS for Android (latest build)](https://github.com/skylerhall/odos/releases/latest).
+On your phone, tap `odos.apk`, then Install. Android asks once to allow installs from your browser;
+that's normal for apps from outside the Play Store.
+
+## Build your own
+
+You need Node 22 and a free [Mapbox](https://www.mapbox.com) account.
+
+1. **Get a Mapbox public token.** Open [Access tokens](https://account.mapbox.com/access-tokens) and
+   copy the **Default public token** (it starts with `pk.`).
 2. **Install and add the token:**
    ```bash
    git clone https://github.com/skylerhall/odos.git
@@ -35,76 +49,96 @@ how to send someone your location.
    npm install
    cp .env.example .env      # then paste your pk. token into .env
    ```
-3. *(Optional)* Get a free [Recreation.gov RIDB key](https://ridb.recreation.gov) and add it to `.env`
-   as `EXPO_PUBLIC_RIDB_KEY`. This adds federal campgrounds to the rest finder.
+3. *(Optional)* Add a free [Recreation.gov RIDB key](https://ridb.recreation.gov) to `.env` as
+   `EXPO_PUBLIC_RIDB_KEY` for federal campgrounds in the rest finder.
 
-## Put it on your phone
+Then pick one:
 
-**Easiest: download the latest build.** GitHub builds a fresh APK every time `main` changes. On
-your phone, open https://github.com/skylerhall/odos/releases/latest (signed in to GitHub), tap
-`odos.apk`, then tap Install. For the map to work, add your Mapbox public token once as a repo
-secret named `MAPBOX_TOKEN` (Settings → Secrets and variables → Actions → New repository secret),
-then re-run the build from the Actions tab.
+- **Build in GitHub Actions (nothing to install).** In your fork, enable Actions, then add a
+  repository secret named `MAPBOX_TOKEN` (Settings → Secrets and variables → Actions). Every push to
+  `main` builds an APK and publishes it to your fork's Releases.
+- **Build on your computer** (needs Android Studio once): `npm run apk` builds `odos.apk`.
+- **Build with EAS** (Expo's cloud):
+  ```bash
+  npx eas-cli@latest login
+  npx eas-cli@latest env:create --name EXPO_PUBLIC_MAPBOX_TOKEN --value pk.your_token --environment preview --visibility plaintext
+  npx eas-cli@latest build -p android --profile preview
+  ```
+- **Develop with live reload:** `npm run android` with a phone plugged in or an emulator running.
+  ODOS uses native Mapbox, so it doesn't run in Expo Go.
 
-**Option A: build the APK on your computer** (you need Android Studio installed once):
+### Signing
 
-```bash
-npm run apk
-```
+Without signing secrets, builds use the shared Android debug key. That's fine for trying the app, but
+only builds signed with the same key install over each other, and Google Play needs your own key. To
+sign with yours, create a keystore with the alias `odos` and add two repository secrets:
+`ANDROID_KEYSTORE_BASE64` (the keystore file, base64-encoded) and `ANDROID_KEYSTORE_PASSWORD`. See
+`scripts/ci/load-signing-key.sh` and `plugins/withReleaseSigning.js`. Never commit a keystore.
 
-This checks your token, Java and the Android SDK, builds a release APK, and saves it as `odos.apk`
-in the project folder. Upload it to Google Drive, open it on your phone, and tap Install. Android
-asks once to allow installs from Drive; that's normal for sideloading.
+### Publishing a fork
 
-**Option B: build in the cloud** (nothing to install except Node):
+If you publish your own build, please make it your own:
 
-```bash
-npx eas-cli@latest login
-npx eas-cli@latest env:create --name EXPO_PUBLIC_MAPBOX_TOKEN --value pk.your_token --environment preview --visibility plaintext
-npx eas-cli@latest build -p android --profile preview
-```
+- Change `name`, `slug` and `android.package` in `app.json` (the package name must be unique on
+  Google Play).
+- Use your own name and icon (see [Name and logo](#name-and-logo)).
+- Set `APP_CONTACT` in `src/config.ts` to your app's name and a page people can reach you through.
+  OpenStreetMap and the National Weather Service ask apps to identify themselves.
+- Check the terms of the data services below, especially if your app is commercial.
+- Write your own privacy policy. `docs/privacy-policy.md` describes this app and is a starting point.
 
-When the build finishes, EAS gives you a link and QR code. Open it on your phone to install.
+## Data sources
 
-**For development** (live reload while you change code): `npm run android` with the phone plugged in
-or an emulator running. ODOS uses native Mapbox, so it won't run in Expo Go.
+| Service | Used for | Terms to know |
+|---|---|---|
+| [Mapbox](https://www.mapbox.com) | Maps, routing, traffic, search | Free tier, then paid. Its logo and attribution must stay visible on the map. |
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) via [Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API) | Trails, free overnight parking | © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/). The public Overpass servers are shared; keep requests light. |
+| [Open-Meteo](https://open-meteo.com) | Weather and forecasts | The free API is for **non-commercial use**. Commercial apps need an Open-Meteo plan. |
+| [National Weather Service](https://www.weather.gov/documentation/services-web-api) | Weather alerts (US) | Public domain. |
+| [fueleconomy.gov](https://www.fueleconomy.gov/feg/ws/) and [NHTSA vPIC](https://vpic.nhtsa.dot.gov/api/) | Vehicle MPG, VIN decoding | US government data. |
+| [Recreation.gov RIDB](https://ridb.recreation.gov) | Federal campgrounds | Free key. |
 
 ## Project layout
 
 ```
 src/
-  config.ts          The rules: 50-mi buffer, 15–30 mi gas window, 2-hr rest limit, lane weights
-  core/              Pure logic, unit-tested: geo, fuel, places, lanes, route, nav, vehicles
-  services/          Mapbox, fueleconomy.gov, NHTSA, OpenStreetMap, Recreation.gov, Open-Meteo, NWS, offline packs
-  state/             useOdos (GPS, routing, fuel, lanes) and useWeather (conditions, route forecast, alerts)
-  ui/                Map, maneuver + lane banner, fuel panel, weather effects, sheets
-tests/              npm test
-scripts/build-apk.sh npm run apk
+  config.ts       Tunable rules: 50-mi buffer, 15–30 mi gas window, 2-hr rest limit, trail settings
+  core/           Pure TypeScript, unit-tested: geometry, fuel, routes, turn-by-turn, trails, vehicles, search
+  services/       Network and device I/O: Mapbox, Overpass, Open-Meteo, NWS, EPA, NHTSA, offline packs, storage
+  state/          useOdos (GPS, routing, fuel, persistence), useWeather, useTrail
+  ui/             Map, banner, panels, sheets
+tests/            npm test (tests/live hits real APIs: npm run test:live)
+plugins/          Expo config plugins (release signing)
+scripts/          APK build, CI helpers, position-marker artwork
 ```
 
-Checks: `npm test`, `npm run typecheck` and `npm run lint`.
+Checks before a pull request: `npm test`, `npm run typecheck` and `npm run lint`. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What's real and what's next
+## Roadmap
 
-What works now:
-- Routing, traffic, lane arrows, voice prompts, rerouting, search, gas and rest lookups, weather,
-  and offline map tiles all use real APIs.
-- The fuel model, the 50-mile buffer and the 15–30 mile gas window run on real GPS distance.
+- **Lane advice on screen.** The lane-scoring engine (70% live lane speed, 30% historical flow) is in
+  `src/core/lanes.ts`, but no public API provides live per-lane speeds, so it only runs in Sim mode
+  and isn't shown while driving.
+- **Background navigation:** keep guiding with the screen off.
+- **Live location sharing:** a link that updates as you drive.
+- **Hazard reports:** police, closures and road hazards, through a small backend.
+- **iOS.** The app is built with Expo and should build for iOS, but it's only been tested on Android.
 
-What's still simulated:
-- **Live per-lane speeds.** No public traffic API provides them. Lane arrows (which lanes make your
-  next turn) are real map data. The speed-based 70/30 lane advice runs on simulated lane speeds in
-  Sim mode until a real data source exists.
+## Privacy
 
-Roadmap, in order:
-1. **Camera lane detection.** An on-device model works out which lane you're in from a dash-mounted
-   phone. That makes "move one lane left" possible instead of only "best lane."
-2. **Crowdsourced lane speeds.** Camera-equipped ODOS drivers report lane speeds anonymously. That
-   supplies the live 70% and builds the historical 30% human-flow data.
-3. **Waze-style reports.** Hazards, police and closures, through a small backend.
-4. **Live location sharing.** A link that updates as you drive. This needs the same backend.
-5. **Background navigation.** Keep guiding with the screen off.
-6. **Native Mapbox Navigation SDK module.** Rerouting even with no signal at all.
+ODOS has no accounts, no ads, no analytics of its own and no server. Your location goes only to the
+map, routing, weather and search services above, to answer your request. Trips, vehicles and saved
+places stay on your phone. The Mapbox map sends anonymous usage data to Mapbox, which you can turn
+off from the (i) button on the map. Full policy: [docs/privacy-policy.md](docs/privacy-policy.md).
 
-A note on phone settings: ODOS asks for location permission the normal way and never tries to get
-around the phone's settings. Android blocks that, and apps that try get flagged as malware.
+ODOS asks for location permission the normal way and never tries to get around the phone's settings.
+
+## Name and logo
+
+The code is MIT-licensed. The ODOS name and logo are not part of that license: if you publish a fork,
+please give it its own name and icon so people can tell them apart.
+
+## License
+
+[MIT](LICENSE) © 2026 Egghead Development

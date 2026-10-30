@@ -1,3 +1,5 @@
+import { APP_CONTACT } from '../config';
+
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -34,7 +36,7 @@ export async function fetchJson<T>(url: string, init: RequestInit & { timeoutMs?
 export const OVERPASS_HEADERS = {
   'Content-Type': 'application/x-www-form-urlencoded',
   Accept: 'application/json',
-  'User-Agent': 'ODOS-navigation/0.1 (+https://skylerhall.github.io/odos-privacy/)',
+  'User-Agent': `${APP_CONTACT.name}-navigation/0.1 (+${APP_CONTACT.url})`,
 };
 
 export const qs = (params: Record<string, string | number | boolean | undefined>) =>

@@ -4,6 +4,12 @@ export const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 /** Optional: free key from https://ridb.recreation.gov for federal campgrounds. */
 export const RIDB_KEY = process.env.EXPO_PUBLIC_RIDB_KEY ?? '';
 
+/**
+ * Who is asking, for the public APIs that want to know (OpenStreetMap Overpass, the National Weather
+ * Service). If you publish a fork, use your own app name and a page people can reach you through.
+ */
+export const APP_CONTACT = { name: 'ODOS', url: 'https://github.com/skylerhall/odos' };
+
 export const FUEL = {
   /** Alert and auto-plan a gas stop when estimated range drops to this many miles. */
   bufferMiles: 50,
